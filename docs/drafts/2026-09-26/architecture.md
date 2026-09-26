@@ -21,7 +21,7 @@ UART、電源、USB線の空間を予約した機械設計です。XIAO側のUAR
 
 XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイコン案。Pico側の既存ファーム流用を優先する選択肢です。部品・配線は増え、XIAOとUI間の通信実装は依然必要です。
 
-## D: M5Dial 単体（ESP32-S3 のみ）— **2026-09-26 採用**（requirements H3。E 案との最終選択は open-questions Q27）
+## D: M5Dial 単体（ESP32-S3 のみ）— 2026-09-26 採用後、同日 E 案に置き換え（requirements H4）
 
 | 部品 | 担当 |
 | --- | --- |
@@ -38,7 +38,7 @@ XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイ�
 - RAM：M5Dial は PSRAM なし（SRAM 512 KB）。BLE・USB・画面・コア処理を収める。Wi-Fi は使わない前提。
 - 技適：M5Dial V1.1 の技適を確認する（open-questions Q24）。
 
-## E: XIAO をエンジン、M5Dial は画面とダイヤルだけ — 検討中（D 案との比較、未決定）
+## E: XIAO をエンジン、M5Dial は画面とダイヤルだけ — **2026-09-26 採用**（requirements H4）
 
 ```
 [BLE 機器] ~~BLE~~▶ XIAO nRF52840 Plus（本家 BLE 版：受信・リマップ・PC への USB 出力）──USB-C──▶ PC
@@ -56,7 +56,7 @@ XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイ�
 | 最初に動くまで | 移植と BLE 実装の後 | 本家ファームを書けば初日から（画面は後から） |
 | UART | 不要 | 状態と操作だけなので通信量はわずか（以前の 1 Mbaud の問題はキー入力を UART で運ぶ前提だった） |
 
-会話では E 案を推奨したが、ユーザーが初代 M5Dial（技適あり）を使うと分かり、D 案の最大の懸念が消えた。どちらにするかは、初代 M5Dial での BLE の実験結果で決める（open-questions Q27）。
+会話では E 案を推奨したが、ユーザーが初代 M5Dial（技適あり）を使うと分かり、D 案の最大の懸念が消えた。その後ユーザーが「同時 4 台、15 ms は不可」と決め（F1-3）、複数台を 7.5 ms で受ける実績がある nRF52840 を使う E 案に確定した（Q27 解決）。
 
 ## ESP32-S3 と nRF52840 の比較（2026-09-26）
 
