@@ -58,6 +58,24 @@ XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイ�
 
 会話では E 案を推奨したが、ユーザーが初代 M5Dial（技適あり）を使うと分かり、D 案の最大の懸念が消えた。どちらにするかは、初代 M5Dial での BLE の実験結果で決める（open-questions Q27）。
 
+## ESP32-S3 と nRF52840 の比較（2026-09-26）
+
+出典：ESP32-S3 Series Datasheet v2.2、Nordic の nRF52840 製品ページと製品仕様書。
+
+| 項目 | ESP32-S3（初代 M5Dial の StampS3） | nRF52840（XIAO nRF52840 Plus） |
+| --- | --- | --- |
+| CPU | Xtensa LX7 デュアルコア 240 MHz | Cortex-M4F 64 MHz |
+| RAM / フラッシュ | 512 KB（PSRAM なし）/ 8 MB 内蔵 | 256 KB / 1 MB（XIAO は外付け 2 MB を追加） |
+| Bluetooth | BLE 5（1M・2M・Coded PHY）。Classic 非対応 | BLE 5.4（1M・2M・Long Range）。Classic 非対応 |
+| BLE の送信出力 / 受信感度（1 Mbps） | 最大 +20 dBm / −97.5 dBm | 最大 +8 dBm / −95 dBm |
+| 無線 | Wi-Fi と共用 | BLE 専用（802.15.4、NFC も持つ） |
+| 同時接続 | 最大 9（Espressif 資料） | 本家 HID Remapper の設定で 8 |
+| USB | USB 1.1 相当の OTG（ホストにも機器にもなれる）＋書き込み・デバッグ専用 USB（同じ端子を共用） | USB 1.1 相当、機器側のみ |
+| UART | 最大 5 Mbps | 最大 1 Mbps の見込み（要確認） |
+| 消費電力 | スリープ 7 µA | 送信 4.8 mA、受信 4.6 mA、スリープ 1.5 µA |
+
+**Orbit の役割ごとの向き不向き**：BLE で複数台を受ける → nRF52840 が実績で有利（[prior-art](prior-art.md#nrf52840-に-ble-の実績が多い理由2026-09-26-整理)）。画面とタッチの描画 → S3。PC への USB 出力 → 性能は同等、nRF は本家がそのまま動く（S3 で使うと書き込み・デバッグ用 USB が使えなくなる）。機器ごとのレイヤーなどの拡張 → メモリは S3 が 2 倍。技適は手元の機材ならどちらも可。
+
 ## 端子と操作子の過不足（2026-09-26 整理）
 
 M5Stack Dial V1.1 の公式ページと Seeed の公式 Wiki による。初代 M5Dial の GPIO 割り当ては、回路図で見る限り Grove と主要部品は同じ（ボタンの GPIO は資料に記載なし）。

@@ -83,4 +83,12 @@ CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得�
 - 同 M5Stack Community の投稿: https://community.m5stack.com/topic/8307/cardputer-kb-ble-hid-remapper-for-cardputer-adv-web-ui-on-device-wifi-ota
 - WikDra/esp32-hid-gamepad-bridge（コミット 9053d9d、2026-09-13）: https://github.com/WikDra/esp32-hid-gamepad-bridge
 - M5Stack Community（ロゴ使用の質問）: https://community.m5stack.com/topic/5236/use-of-the-m5-stack-logo-in-projects
+- finger563/esp-usb-ble-hid（コミット e0a18ae、2026-09-18）: https://github.com/finger563/esp-usb-ble-hid
+- esp32beans/BLE_HID_Client（コミット aab46c8、2022-09-19）: https://github.com/esp32beans/BLE_HID_Client
+- ESP-IDF Multi-Connection Guide（ESP32-S3）: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/ble/ble-multiconnection-guide.html
+- ESP32-S3 Series Datasheet v2.2: https://documentation.espressif.com/esp32-s3_datasheet_en.pdf
+- nRF52840 製品ページ: https://www.nordicsemi.com/Products/nRF52840
+- nRF52840 Product Specification（Key features）: https://docs.nordicsemi.com/bundle/ps_nrf52840/page/keyfeatures_html5.html
+- ZMK Split Keyboards: https://zmk.dev/docs/features/split-keyboards
+- HID Remapper Forum（Bluetooth Classic version testing, ESP32）: https://forum.remapper.org/t/bluetooth-classic-version-testing-esp32/18
 
