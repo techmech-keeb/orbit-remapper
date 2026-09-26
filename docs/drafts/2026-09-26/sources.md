@@ -71,4 +71,4 @@ CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得�
 - LilyGO T-Encoder Pro: https://github.com/Xinyuan-LilyGO/T-Encoder-Pro
 - Waveshare ESP32-S3-Knob-Touch-LCD-1.8: https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm
 - VIEWE 2.1" Knob Display: https://viewedisplay.com/product/esp32-2-1-inch-480x480-round-tft-knob-display-rotary-encoder-arduino-lvgl/
-
+- 秋月電子 M5Stamp S3（技適 219-229318。初代 M5Dial に搭載）: https://akizukidenshi.com/catalog/g/g118194/
