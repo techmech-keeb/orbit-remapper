@@ -37,7 +37,7 @@ USBポートの挙動は[マニュアル「Per-device mappings」](https://www.r
 - BLEスキャンのアドレスフィルターも`8`。既存のペアリング機器を優先して再接続し、ペアリング操作で新規機器を探す。**9台以上を保存した場合の再接続挙動は未検証**。通信品質・消費電力・入力遅延も台数別試験が要る。[main.cc](https://github.com/jfedor2/hid-remapper/blob/51ab8b367b810d1deb0d3e487e9b7fe8c7e9c24e/firmware-bluetooth/src/main.cc)
 - XIAOではWeb設定画面かpin 0の短押しでペアリング、長押しで**全**ペアリング情報を削除。個別削除や名前を付けた接続機器管理は標準UIの要求として未確認。BLEの再接続は記述子等をキャッシュしないため時間がかかり得る。[公式Bluetooth説明](https://github.com/jfedor2/hid-remapper/blob/master/BLUETOOTH.md)
 - 入力報告はBLE側で長さ16のキューに積み、満杯時はその報告を処理できない経路がある。ソースに複数機器の記述子読み取りの同時進行に関する未検証コメントもある。多数同時接続や高速入力は実測が必要。[main.cc](https://github.com/jfedor2/hid-remapper/blob/51ab8b367b810d1deb0d3e487e9b7fe8c7e9c24e/firmware-bluetooth/src/main.cc)
-- **押下中に機器が切れた場合のキー解除は要重点試験**。ソースでは切断時に機器の記述子とポート状態を消すが、共通の入力ビットを明示的に解放する処理は確認できなかった。全ポート共通設定でキーや修飾キーが押されたまま残る可能性があり、実機で再現・解消方法を確認する。[descriptor_parser.cc](https://github.com/jfedor2/hid-remapper/blob/51ab8b367b810d1deb0d3e487e9c24e/firmware/src/descriptor_parser.cc)、[remapper.cc](https://github.com/jfedor2/hid-remapper/blob/51ab8b367b810d1deb0d3e487e9b7fe8c7e9c24e/firmware/src/remapper.cc)
+- **押下中に機器が切れた場合のキー解除は要重点試験**。ソースでは切断時に機器の記述子とポート状態を消すが、共通の入力ビットを明示的に解放する処理は確認できなかった。全ポート共通設定でキーや修飾キーが押されたまま残る可能性があり、実機で再現・解消方法を確認する。[descriptor_parser.cc](https://github.com/jfedor2/hid-remapper/blob/51ab8b367b810d1deb0d3e487e9b7fe8c7e9c24e/firmware/src/descriptor_parser.cc)、[remapper.cc](https://github.com/jfedor2/hid-remapper/blob/51ab8b367b810d1deb0d3e487e9b7fe8c7e9c24e/firmware/src/remapper.cc)
 - USB側はハブと入力機器の組み合わせにより相性がある。ポート数・配線だけでなく、5 V給電容量、起動順、再挿抜を対象構成で試験する。[Pico版の説明](https://github.com/jfedor2/hid-remapper/blob/master/HARDWARE.md)
 
 ## Orbitの要件として決める項目（未決定）
