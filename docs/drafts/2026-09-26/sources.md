@@ -72,3 +72,15 @@ CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得�
 - Waveshare ESP32-S3-Knob-Touch-LCD-1.8: https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm
 - VIEWE 2.1" Knob Display: https://viewedisplay.com/product/esp32-2-1-inch-480x480-round-tft-knob-display-rotary-encoder-arduino-lvgl/
 - 秋月電子 M5Stamp S3（技適 219-229318。初代 M5Dial に搭載）: https://akizukidenshi.com/catalog/g/g118194/
+
+## 類似プロジェクト（2026-09-26 確認）
+
+いずれも最終確認日 2026-09-26。ソースコードを取得して読んだ時点のコミットを記す。
+
+- ifritJP/bt-keyboard-remapper（コミット 19fb7c1、2022-02-24）: https://github.com/ifritJP/bt-keyboard-remapper
+- 同 解説記事: https://ifritjp.github.io/blog2/public/posts/2022/2022-02-22-bt-keyboard-remapper/
+- ZUENS2020/cardputer-kb（2026-08-08 更新）: https://github.com/ZUENS2020/cardputer-kb
+- 同 M5Stack Community の投稿: https://community.m5stack.com/topic/8307/cardputer-kb-ble-hid-remapper-for-cardputer-adv-web-ui-on-device-wifi-ota
+- WikDra/esp32-hid-gamepad-bridge（コミット 9053d9d、2026-09-13）: https://github.com/WikDra/esp32-hid-gamepad-bridge
+- M5Stack Community（ロゴ使用の質問）: https://community.m5stack.com/topic/5236/use-of-the-m5-stack-logo-in-projects
+
