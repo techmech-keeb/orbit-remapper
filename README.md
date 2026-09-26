@@ -16,12 +16,12 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2.
 - [未解決事項と確定条件](docs/drafts/2026-09-26/open-questions.md)
 - [成果物一覧と原本の位置づけ](docs/drafts/2026-09-26/artifacts.md)
 
-## 現在の二つの方向
+## 構成
 
-| 方向 | 状態 |
+| 構成 | 状態 |
 | --- | --- |
-| E1 Orbital Pod + Glass2 + XIAO + Pico | E1コンセプトはユーザー採用。機構試作案v0.3のCAD等を保存。最終外観・実機適合・製造は未承認。 |
-| M5Dial + XIAO（S3がUIとUSBホストを兼任） | 分岐検討。採用、対象製品リビジョン、通信、ファーム、筐体は未確定・未検証。 |
+| M5Dial + XIAO（S3がUIとUSBホストを兼任） | **2026-09-26 採用。** 透過表示の要件（R02）は取り下げ。対象製品リビジョン、通信、ファーム、筐体は未確定・未検証。 |
+| E1 Orbital Pod + Glass2 + XIAO + Pico | 機構試作案v0.3のCAD等を経緯として保存。現行の構成ではない。 |
 
 ## リポジトリ
 
