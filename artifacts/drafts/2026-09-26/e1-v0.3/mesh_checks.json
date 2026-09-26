@@ -1,0 +1,32 @@
+{
+  "01_upper_shell.stl": {
+    "triangles": 45022,
+    "nonmanifold_or_open_edges": 0,
+    "closed_two_manifold": true
+  },
+  "02_bottom.stl": {
+    "triangles": 11488,
+    "nonmanifold_or_open_edges": 0,
+    "closed_two_manifold": true
+  },
+  "03_display_carrier.stl": {
+    "triangles": 4786,
+    "nonmanifold_or_open_edges": 0,
+    "closed_two_manifold": true
+  },
+  "04_knob.stl": {
+    "triangles": 31312,
+    "nonmanifold_or_open_edges": 0,
+    "closed_two_manifold": true
+  },
+  "05_back_button.stl": {
+    "triangles": 1556,
+    "nonmanifold_or_open_edges": 0,
+    "closed_two_manifold": true
+  },
+  "06_reset_button.stl": {
+    "triangles": 1508,
+    "nonmanifold_or_open_edges": 0,
+    "closed_two_manifold": true
+  }
+}
