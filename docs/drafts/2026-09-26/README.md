@@ -10,6 +10,8 @@ finalized: false
 
 ## 読む順序
 
+> 別セッションへの引き継ぎは [handoff.md](handoff.md) から読む。
+
 1. [要求と決定状況](requirements.md): 明示条件、受諾前提、設計判断、提案を区別。
 2. [経緯](history.md): 初期案からE1、M5Dial分岐、命名、GitHub管理まで。
 3. [構成比較](architecture.md): E1とM5Dialの混同を防ぐ。
@@ -18,7 +20,9 @@ finalized: false
 6. [未解決事項](open-questions.md): 次に確認する内容。
 7. [成果物一覧](artifacts.md): CAD と検査記録の索引、非公開の原本・生成物の置き場所。
 8. [開発・文書運用案](development.md): 二つのリポジトリ、互換性、文書の確定方法。
-9. [命名記録](naming.md)、[出典](sources.md)。
+9. [類似プロジェクトの分析](prior-art.md): ESP32 で BLE キーボードを扱う先行例と、ESP-IDF の不具合。
+10. [命名記録](naming.md)、[出典](sources.md)。
+11. [Q31 実験の依頼書](q31-experiment-brief.md): M5Dial で BLE 機器 2 台を 7.5 ms で受けられるかを試す試験プログラムの仕様。
 
 ## 記録の確度
 

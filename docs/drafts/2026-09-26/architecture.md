@@ -6,7 +6,7 @@ finalized: false
 
 # 構成の分岐と技術的な未確定事項
 
-## A: E1 / Glass2 / Pico — 既存機構試作案
+## A: E1 / Glass2 / Pico — 既存機構試作案（2026-09-26 に C 案を採用したため、経緯として保存）
 
 | 部品 | 元BOM・設計時の担当 |
 | --- | --- |
@@ -17,11 +17,102 @@ finalized: false
 
 UART、電源、USB線の空間を予約した機械設計です。XIAO側のUART受信・BLEとの共存や、元BOM全体の動作が確認済みという意味ではありません。
 
-## B: M5DialをUIとして追加 — 検討案
+## B: M5DialをUIとして追加 — 検討案（C 案の採用により不採用）
 
 XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイコン案。Pico側の既存ファーム流用を優先する選択肢です。部品・配線は増え、XIAOとUI間の通信実装は依然必要です。
 
-## C: M5Dial内のS3がUIとUSBホストを兼任 — 有力な検討案
+## D: M5Dial 単体（ESP32-S3 のみ）— 2026-09-26 採用後、同日 E 案に置き換え（requirements H4）
+
+| 部品 | 担当 |
+| --- | --- |
+| M5Dial の ESP32-S3 | BLE 機器の受信（ESP-IDF の BLE HID ホスト）、リマップ（本家コアを移植）、画面・タッチ・ダイヤル、PC への USB 出力（TinyUSB の機器側） |
+| M5Dial の USB-C | PC への接続と給電。パネル取付の延長ケーブルで筐体背面に出す |
+
+有線の USB 機器、XIAO、Pico、Grove の配線は使わない。検討の経緯は下の A〜C 案と requirements の H1〜H3。
+
+### D 案で詰めること
+
+- 本家コア（`remapper.cc` など）の ESP-IDF への移植。本家はコアをマイコン依存部から分けており、nRF52840（Zephyr）への移植実績がある。
+- PC 側 USB（レポート記述子、設定ツール用の窓口、boot protocol、リモートウェイクアップ）の TinyUSB への移植。
+- BLE HID ホスト：同時接続台数、再接続、遅延、LED の送り返し（F5）。
+- RAM：M5Dial は PSRAM なし（SRAM 512 KB）。BLE・USB・画面・コア処理を収める。Wi-Fi は使わない前提。
+- 技適：M5Dial V1.1 の技適を確認する（open-questions Q24）。
+
+## E: XIAO をエンジン、M5Dial は画面とダイヤルだけ — **2026-09-26 採用**（requirements H4）
+
+```
+[BLE 機器] ~~BLE~~▶ XIAO nRF52840 Plus（本家 BLE 版：受信・リマップ・PC への USB 出力）──USB-C──▶ PC
+                              │ Grove の 2 本（UART。画面に出す状態とダイヤル操作だけ）
+                              ▼
+                   M5Dial（画面とダイヤル。無線は使わない。電源は USB-C に筐体内で 5 V を入れる）
+```
+
+| | D 案（M5Dial 単体） | E 案（XIAO＋M5Dial） |
+| --- | --- | --- |
+| 技適 | 初代 M5Dial（StampS3、219-229318）で可。V1.1 は未確認 | XIAO（222-257139）で可。M5Dial の無線は使わない |
+| 部品 | M5Dial のみ | XIAO と M5Dial |
+| BLE 受信 | ESP32-S3 で新規（esp32-hid-gamepad-bridge の修正済み `esp_hid` を土台にできる。[prior-art](prior-art.md)） | 本家 BLE 版がそのまま動く |
+| リマップ | 本家コアを ESP-IDF へ移植 | 本家のまま |
+| 最初に動くまで | 移植と BLE 実装の後 | 本家ファームを書けば初日から（画面は後から） |
+| UART | 不要 | 状態と操作だけなので通信量はわずか（以前の 1 Mbaud の問題はキー入力を UART で運ぶ前提だった） |
+
+会話では E 案を推奨したが、ユーザーが初代 M5Dial（技適あり）を使うと分かり、D 案の最大の懸念が消えた。その後ユーザーが「同時 4 台、15 ms は不可」と決め（F1-3）、複数台を 7.5 ms で受ける実績がある nRF52840 を使う E 案に確定した（Q27 解決）。その後、実績の範囲に合わせて同時 2 台に下げた。S3 でも 7.5 ms の 2 本の同居は実測例があるため、D 案は実験（Q31）次第で再評価できる。構成は E 案のまま。
+
+## ESP32-S3 と nRF52840 の比較（2026-09-26）
+
+出典：ESP32-S3 Series Datasheet v2.2、Nordic の nRF52840 製品ページと製品仕様書。
+
+| 項目 | ESP32-S3（初代 M5Dial の StampS3） | nRF52840（XIAO nRF52840 Plus） |
+| --- | --- | --- |
+| CPU | Xtensa LX7 デュアルコア 240 MHz | Cortex-M4F 64 MHz |
+| RAM / フラッシュ | 512 KB（PSRAM なし）/ 8 MB 内蔵 | 256 KB / 1 MB（XIAO は外付け 2 MB を追加） |
+| Bluetooth | BLE 5（1M・2M・Coded PHY）。Classic 非対応 | BLE 5.4（1M・2M・Long Range）。Classic 非対応 |
+| BLE の送信出力 / 受信感度（1 Mbps） | 最大 +20 dBm / −97.5 dBm | 最大 +8 dBm / −95 dBm |
+| 無線 | Wi-Fi と共用 | BLE 専用（802.15.4、NFC も持つ） |
+| 同時接続 | 最大 9（Espressif 資料） | 本家 HID Remapper の設定で 8 |
+| USB | USB 1.1 相当の OTG（ホストにも機器にもなれる）＋書き込み・デバッグ専用 USB（同じ端子を共用） | USB 1.1 相当、機器側のみ |
+| UART | 最大 5 Mbps | 最大 1 Mbps の見込み（要確認） |
+| 消費電力 | スリープ 7 µA | 送信 4.8 mA、受信 4.6 mA、スリープ 1.5 µA |
+
+**Orbit の役割ごとの向き不向き**：BLE で複数台を受ける → nRF52840 が実績で有利（[prior-art](prior-art.md#nrf52840-に-ble-の実績が多い理由2026-09-26-整理)）。画面とタッチの描画 → S3。PC への USB 出力 → 性能は同等、nRF は本家がそのまま動く（S3 で使うと書き込み・デバッグ用 USB が使えなくなる）。機器ごとのレイヤーなどの拡張 → メモリは S3 が 2 倍。技適は手元の機材ならどちらも可。
+
+## 端子と操作子の過不足（2026-09-26 整理）
+
+M5Stack Dial V1.1 の公式ページと Seeed の公式 Wiki による。初代 M5Dial の GPIO 割り当ては、回路図で見る限り Grove と主要部品は同じ（ボタンの GPIO は資料に記載なし）。
+
+**M5Dial**
+
+| 分類 | 内容 | 用途 |
+| --- | --- | --- |
+| マイコン | ESP32-S3FN8（240 MHz デュアルコア、フラッシュ 8 MB、PSRAM なし）、Wi-Fi・BLE | D 案ではすべて、E 案では画面と操作 |
+| 画面・タッチ | 1.28 インチ丸型 TFT 240×240（GC9A01）、タッチ（FT3267） | 状態表示、メニュー、簡単な編集（F3） |
+| ダイヤル・ボタン | ロータリーエンコーダ（64 パルス/回転）、画面の押し込み、WAKE、RST | レイヤー切替、決定、リセット |
+| USB-C | Stamp の USB（書き込み・デバッグ）。電源の入口 | D 案では PC への口。E 案では電源のみ |
+| PORT.A / PORT.B（Grove） | GPIO13・15 / GPIO2・1。VCC は外への出力のみ（給電不可） | 自由に使える GPIO はこの 4 本だけ |
+| その他 | NFC リーダー、RTC、ブザー、RGB LED（V1.1） | ブザーは操作音に使える。NFC は設定セット切替の候補 |
+
+**XIAO nRF52840 Plus**（E 案で使う）
+
+| 分類 | 内容 | 用途 |
+| --- | --- | --- |
+| マイコン | nRF52840（64 MHz、RAM 256 KB）、BLE、フラッシュ 2 MB | BLE 受信、リマップ、PC への USB 出力 |
+| USB-C | 機器側 | PC への接続と給電 |
+| D0〜D10 | D6/D7 が UART | M5Dial との UART |
+| Plus の追加端子（裏面 D11〜D19） | 2 つ目の UART・SPI など | 予備 |
+| リセットボタン、RGB LED | 基板上 | 筐体内に隠れるため、R05 の外部リセットは別途必要 |
+
+## M5Dial の代わりの候補（2026-09-26 調査。不採用）
+
+「ESP32-S3＋丸型画面＋ダイヤル」の一体型製品。いずれも技適の記載が見つからなかった（open-questions「技適の調査」）。
+
+| 製品 | 画面 | 外形 | 特徴 |
+| --- | --- | --- | --- |
+| Elecrow CrowPanel 1.28" | 1.28" 240×240（GC9A01） | 48×48×33 mm | UART コネクタ 2 口、I2C 1 口、FPC 端子、PSRAM 8 MB |
+| Waveshare ESP32-S3-Knob-Touch-LCD-1.8 | 1.8" 360×360 | 記載なし | ESP32（初代）も搭載、ダイヤル 2 つ、金属ケース、USB-C は向きで書き込み先を切替 |
+| LilyGO T-Encoder Pro | 丸型 AMOLED 390×390（サイズは資料で 1.2" と 2.04" が食い違う） | 記載なし | パネル固定用の六角ナット、Qwiic 2 口 |
+| VIEWE 2.1" Knob Display | 2.1" 480×480 | 記載なし | 資料が少ない |
+
+## C: M5Dial内のS3がUIとUSBホストを兼任 — 2026-09-26 採用後、同日 D 案に置き換え
 
 | 部品 | 担当の提案 |
 | --- | --- |
