@@ -47,7 +47,7 @@ finalized: false
 | --- | --- | --- |
 | H1 | 表示と操作は M5Dial を使う（丸型 TFT、タッチ、内蔵ダイヤルとボタン） | R02（透過表示）を取り下げ。E1 の Glass2 を収める筐体は流用できず、M5Dial 用の筐体を新たに設計する。E1 の CAD は経緯として残す |
 | H2 | **2026-09-26 H3 により置き換え。** Pico を省く。M5Dial 内の ESP32-S3 が USB ホストと UI を担い、XIAO nRF52840 が BLE 入力・リマップ・PC への USB 出力を担う（architecture の C 案） | Pico B との UART（Q22）は不要になる。S3 の USB ホストのファームは新規。F1-2（外付けハブで複数台）は ESP-IDF の USB ホストのハブ対応に依存する（Q23） |
-| H3 | **M5Dial（ESP32-S3）1 台だけで実装する。入力は BLE 機器のみ、PC への出力は M5Dial の USB-C（S3 の USB を機器側で使う）。** XIAO・Pico・Grove の配線は使わない。有線の USB 機器は対象外（ユーザーは OLSK60v2 など有線機を使えなくなることを了承） | 本家のコア処理と PC 側の USB 機能（BIOS 操作、スリープ解除、設定ツール用の窓口）を ESP-IDF / TinyUSB へ移植する。BLE の受信は ESP-IDF の BLE HID ホスト機能で新規に作る。Bluetooth Classic 専用の機器は使えない（ESP32-S3 は BLE のみ）。USB-C はパネル取付の延長ケーブルで筐体背面に出す |
+| H3 | **（2026-09-26 追記：E 案〔XIAO＋M5Dial〕との最終選択は open-questions Q27 の実験で決める）** **M5Dial（ESP32-S3）1 台だけで実装する。入力は BLE 機器のみ、PC への出力は M5Dial の USB-C（S3 の USB を機器側で使う）。** XIAO・Pico・Grove の配線は使わない。有線の USB 機器は対象外（ユーザーは OLSK60v2 など有線機を使えなくなることを了承） | 本家のコア処理と PC 側の USB 機能（BIOS 操作、スリープ解除、設定ツール用の窓口）を ESP-IDF / TinyUSB へ移植する。BLE の受信は ESP-IDF の BLE HID ホスト機能で新規に作る。Bluetooth Classic 専用の機器は使えない（ESP32-S3 は BLE のみ）。USB-C はパネル取付の延長ケーブルで筐体背面に出す |
 
 H2 を選んだ理由（会話での検討）：Pico B を使うには本家の dual B ファームの改造と 4 本の配線が必要で（Q22）、「無改造で流用」の利点が薄れていた。S3 に移せば、XIAO との通信方式を自由に選べ、画面とダイヤルの処理を XIAO から外せる。本体の画面でできることが多い（F3）ため、丸型カラー画面とタッチの M5Dial が向く。
 

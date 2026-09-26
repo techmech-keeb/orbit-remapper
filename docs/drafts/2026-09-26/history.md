@@ -51,6 +51,10 @@ finalized: false
 | 22 | 「M5Dial に BT があるなら XIAO は不要では。Pico に USB を任せては」 | M5Dial＋Pico 案を比較。M5Dial の USB-C の使いにくさから、同形の他社製品（Elecrow、Waveshare、LilyGO、VIEWE）を調べたが、いずれも技適を確認できなかった。 |
 | 23 | M5Dial の回路図を確認 | Grove から給電できず、書き込み用端子も Grove に出ていないと判明。USB-C を PC への口にして S3 をメインにする案が浮上。 |
 | 24 | 「USB を切り捨てて BT のみにすれば S3 だけで実装できるか」→ 採用 | 入力は BLE のみ、PC への出力は USB。M5Dial 単体の D 案に決定（requirements H3）。有線機（OLSK60v2 など）は対象外。 |
+| 25 | 「ここまで前提が変わると M5Stack Remapper の方がよいか」 | 名前に M5Stack を入れない方針を提案（naming.md）。調査中に類似プロジェクトを発見。 |
+| 26 | 類似プロジェクトをソースまで分析 | esp32-hid-gamepad-bridge に ESP-IDF の BLE HID の不具合と修正の記録があった（prior-art.md）。XIAO をエンジンにし M5Dial を画面だけに使う E 案を推奨。 |
+| 27 | 「マウスの応答速度の上限はコードで直せないのか」 | 15 ms の下限は先行例の条件での結果で、Orbit の条件では未確定と訂正（prior-art.md）。 |
+| 28 | S3 の技適を再調査、ユーザーの M5Dial は初代と判明 | 初代は M5StampS3（219-229318）で技適あり。V1.1（Stamp-S3A）は未確認。D 案の最大の懸念が消え、D 案と E 案の選択は実験で決めることにした（Q27）。 |
 
 ## 見送り理由を捏造しない
 

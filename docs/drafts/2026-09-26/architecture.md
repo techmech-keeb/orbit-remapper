@@ -21,7 +21,7 @@ UART、電源、USB線の空間を予約した機械設計です。XIAO側のUAR
 
 XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイコン案。Pico側の既存ファーム流用を優先する選択肢です。部品・配線は増え、XIAOとUI間の通信実装は依然必要です。
 
-## D: M5Dial 単体（ESP32-S3 のみ）— **2026-09-26 採用**（requirements H3）
+## D: M5Dial 単体（ESP32-S3 のみ）— **2026-09-26 採用**（requirements H3。E 案との最終選択は open-questions Q27）
 
 | 部品 | 担当 |
 | --- | --- |
@@ -37,6 +37,62 @@ XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイ�
 - BLE HID ホスト：同時接続台数、再接続、遅延、LED の送り返し（F5）。
 - RAM：M5Dial は PSRAM なし（SRAM 512 KB）。BLE・USB・画面・コア処理を収める。Wi-Fi は使わない前提。
 - 技適：M5Dial V1.1 の技適を確認する（open-questions Q24）。
+
+## E: XIAO をエンジン、M5Dial は画面とダイヤルだけ — 検討中（D 案との比較、未決定）
+
+```
+[BLE 機器] ~~BLE~~▶ XIAO nRF52840 Plus（本家 BLE 版：受信・リマップ・PC への USB 出力）──USB-C──▶ PC
+                              │ Grove の 2 本（UART。画面に出す状態とダイヤル操作だけ）
+                              ▼
+                   M5Dial（画面とダイヤル。無線は使わない。電源は USB-C に筐体内で 5 V を入れる）
+```
+
+| | D 案（M5Dial 単体） | E 案（XIAO＋M5Dial） |
+| --- | --- | --- |
+| 技適 | 初代 M5Dial（StampS3、219-229318）で可。V1.1 は未確認 | XIAO（222-257139）で可。M5Dial の無線は使わない |
+| 部品 | M5Dial のみ | XIAO と M5Dial |
+| BLE 受信 | ESP32-S3 で新規（esp32-hid-gamepad-bridge の修正済み `esp_hid` を土台にできる。[prior-art](prior-art.md)） | 本家 BLE 版がそのまま動く |
+| リマップ | 本家コアを ESP-IDF へ移植 | 本家のまま |
+| 最初に動くまで | 移植と BLE 実装の後 | 本家ファームを書けば初日から（画面は後から） |
+| UART | 不要 | 状態と操作だけなので通信量はわずか（以前の 1 Mbaud の問題はキー入力を UART で運ぶ前提だった） |
+
+会話では E 案を推奨したが、ユーザーが初代 M5Dial（技適あり）を使うと分かり、D 案の最大の懸念が消えた。どちらにするかは、初代 M5Dial での BLE の実験結果で決める（open-questions Q27）。
+
+## 端子と操作子の過不足（2026-09-26 整理）
+
+M5Stack Dial V1.1 の公式ページと Seeed の公式 Wiki による。初代 M5Dial の GPIO 割り当ては、回路図で見る限り Grove と主要部品は同じ（ボタンの GPIO は資料に記載なし）。
+
+**M5Dial**
+
+| 分類 | 内容 | 用途 |
+| --- | --- | --- |
+| マイコン | ESP32-S3FN8（240 MHz デュアルコア、フラッシュ 8 MB、PSRAM なし）、Wi-Fi・BLE | D 案ではすべて、E 案では画面と操作 |
+| 画面・タッチ | 1.28 インチ丸型 TFT 240×240（GC9A01）、タッチ（FT3267） | 状態表示、メニュー、簡単な編集（F3） |
+| ダイヤル・ボタン | ロータリーエンコーダ（64 パルス/回転）、画面の押し込み、WAKE、RST | レイヤー切替、決定、リセット |
+| USB-C | Stamp の USB（書き込み・デバッグ）。電源の入口 | D 案では PC への口。E 案では電源のみ |
+| PORT.A / PORT.B（Grove） | GPIO13・15 / GPIO2・1。VCC は外への出力のみ（給電不可） | 自由に使える GPIO はこの 4 本だけ |
+| その他 | NFC リーダー、RTC、ブザー、RGB LED（V1.1） | ブザーは操作音に使える。NFC は設定セット切替の候補 |
+
+**XIAO nRF52840 Plus**（E 案で使う）
+
+| 分類 | 内容 | 用途 |
+| --- | --- | --- |
+| マイコン | nRF52840（64 MHz、RAM 256 KB）、BLE、フラッシュ 2 MB | BLE 受信、リマップ、PC への USB 出力 |
+| USB-C | 機器側 | PC への接続と給電 |
+| D0〜D10 | D6/D7 が UART | M5Dial との UART |
+| Plus の追加端子（裏面 D11〜D19） | 2 つ目の UART・SPI など | 予備 |
+| リセットボタン、RGB LED | 基板上 | 筐体内に隠れるため、R05 の外部リセットは別途必要 |
+
+## M5Dial の代わりの候補（2026-09-26 調査。不採用）
+
+「ESP32-S3＋丸型画面＋ダイヤル」の一体型製品。いずれも技適の記載が見つからなかった（open-questions「技適の調査」）。
+
+| 製品 | 画面 | 外形 | 特徴 |
+| --- | --- | --- | --- |
+| Elecrow CrowPanel 1.28" | 1.28" 240×240（GC9A01） | 48×48×33 mm | UART コネクタ 2 口、I2C 1 口、FPC 端子、PSRAM 8 MB |
+| Waveshare ESP32-S3-Knob-Touch-LCD-1.8 | 1.8" 360×360 | 記載なし | ESP32（初代）も搭載、ダイヤル 2 つ、金属ケース、USB-C は向きで書き込み先を切替 |
+| LilyGO T-Encoder Pro | 丸型 AMOLED 390×390（サイズは資料で 1.2" と 2.04" が食い違う） | 記載なし | パネル固定用の六角ナット、Qwiic 2 口 |
+| VIEWE 2.1" Knob Display | 2.1" 480×480 | 記載なし | 資料が少ない |
 
 ## C: M5Dial内のS3がUIとUSBホストを兼任 — 2026-09-26 採用後、同日 D 案に置き換え
 
