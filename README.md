@@ -39,3 +39,16 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2.
 
 検討資料は `docs/drafts/`、当時の成果物は `artifacts/drafts/` に保存します。
 ユーザーが内容を確定した後、対象文書ごとに確定版へ整理します。Draft PRのマージと、製品仕様・製造承認は別の判断です。
+
+## ライセンス
+
+公開前のため、対象ごとのライセンスはまだ確定していません。
+
+| 対象 | ライセンス |
+| --- | --- |
+| ソフトウェア（CAD・描画の生成スクリプト、今後のファームウェア・ツール） | [MIT License](LICENSE) |
+| ハードウェア設計（STEP、DXF、今後の基板データ） | 未確定（CC BY 4.0 または CERN-OHL-P を検討） |
+| 文書 | 未確定（CC BY 4.0 を検討） |
+| 第三者の素材 | 各権利者のライセンスに従う。このリポジトリには含めない |
+
+HID Remapper 由来のコードを取り込む場合は、本家の著作権表示（Copyright (c) 2023 Jacek Fedorynski）と MIT License の条文を残します。

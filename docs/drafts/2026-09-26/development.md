@@ -29,7 +29,7 @@ finalized: false
 
 - **公開できない物をこのリポジトリの履歴に入れない。** 公開すると、削除済みのファイルも履歴から見えます。非公開の原本（元BOM、引き継ぎ文書、設計レビューPDF）は private の `techmech-keeb/keyboard-hardware` の `products/orbit-remapper/` に置きます。第三者の素材（メーカー画像、フォント）はどこにも保存せず、出典のリンクだけを残します。生成物（STL、描画、ビューア）は Release に添付します。詳細は[成果物一覧](artifacts.md)。
 - **公開の方法（提案）。** Draft PR #1（`docs/draft-design-record-20260926`）には仕分け前の全ファイルが入っています。GitHub の PR の参照は利用者側で削除できないため、このリポジトリをそのまま public にすると PR #1 経由で非公開の原本も見えてしまいます。公開するときは、`main` の履歴だけを新しい public リポジトリへ push する方法を基本とします。このリポジトリを直接 public にするなら、事前に GitHub サポートへ PR #1 の削除を依頼する必要があります。
-- **ライセンス。** ソフトウェア・ハードウェア・文書のライセンスは公開前に決めます（open-questions Q17）。
+- **ライセンス。** ソフトウェア（生成スクリプトと今後のファーム）はルートの `LICENSE`（MIT）に従います。ハードウェアと文書のライセンスは公開前に決めます（open-questions Q17）。
 
 将来の候補: `firmware/s3/`、`hardware/pcb/`、`hardware/enclosure/`、`hardware/bom/`、`docs/protocol/`、`docs/decisions/`、`tests/`、`tools/`。
 
