@@ -10,6 +10,8 @@ finalized: false
 
 ## 読む順序
 
+> 別セッションへの引き継ぎは [handoff.md](handoff.md) から読む。
+
 1. [要求と決定状況](requirements.md): 明示条件、受諾前提、設計判断、提案を区別。
 2. [経緯](history.md): 初期案からE1、M5Dial分岐、命名、GitHub管理まで。
 3. [構成比較](architecture.md): E1とM5Dialの混同を防ぐ。
