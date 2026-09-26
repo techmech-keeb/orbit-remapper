@@ -91,4 +91,10 @@ CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得�
 - nRF52840 Product Specification（Key features）: https://docs.nordicsemi.com/bundle/ps_nrf52840/page/keyfeatures_html5.html
 - ZMK Split Keyboards: https://zmk.dev/docs/features/split-keyboards
 - HID Remapper Forum（Bluetooth Classic version testing, ESP32）: https://forum.remapper.org/t/bluetooth-classic-version-testing-esp32/18
+- nRF Desktop の Bluetooth の説明（sdk-nrf、bluetooth.rst）: https://github.com/nrfconnect/sdk-nrf/blob/main/applications/nrf_desktop/bluetooth.rst
+- SoftDevice Controller：Scheduling: https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrfxlib/softdevice_controller/doc/scheduling.html
+- Nordic DevZone（How to schedule multilink connect event?）: https://devzone.nordicsemi.com/f/nordic-q-a/88980/how-to-schedule-multilink-conect-event
+- sdk-nrf のコントローラ Kconfig（イベント長の既定値）: https://github.com/nrfconnect/sdk-nrf/blob/main/subsys/bluetooth/controller/Kconfig
+- Espressif FAQ（BLE / Bluetooth）: https://github.com/espressif/esp-faq/blob/a71fa4f/docs/en/software-framework/ble-bt.rst
+- ESP-IDF ble_multi_conn_cent の README: https://github.com/espressif/esp-idf/blob/master/examples/bluetooth/nimble/ble_multi_conn/ble_multi_conn_cent/README.md
 

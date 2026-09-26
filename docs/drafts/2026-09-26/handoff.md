@@ -12,10 +12,10 @@ finalized: false
 
 1. この文書
 2. [requirements.md](requirements.md) の「構成の決定」（H1〜H3）と「機能要件」（F1〜F6、U1〜U4）
-3. [open-questions.md](open-questions.md) の Q24〜Q30 と、末尾の「回路図」「技適の調査」「Q21」「Q23」の節
+3. [open-questions.md](open-questions.md) の Q24〜Q31 と、末尾の「回路図」「技適の調査」「Q21」「Q23」の節
 4. [architecture.md](architecture.md) の D 案・E 案・ESP32-S3 と nRF52840 の比較
 5. [prior-art.md](prior-art.md)（類似プロジェクトと、ESP-IDF の BLE の不具合）
-6. 必要に応じて [history.md](history.md)（経緯 1〜32）
+6. 必要に応じて [history.md](history.md)（経緯 1〜36）
 
 ## 2. リポジトリとブランチの状態
 
@@ -40,11 +40,12 @@ finalized: false
 
 **E 案に確定（requirements H4）。** XIAO nRF52840 Plus が本家 HID Remapper の BLE 版を土台に、BLE 受信・リマップ・PC への USB 出力を担う。初代 M5Dial は画面とダイヤルだけ（無線は使わない）。両者は Grove の UART でつなぐ。
 
-決め手は、ユーザーが「**同時接続は 4 台まで、15 ms は許容できない**」と決めたこと（F1-3）。複数台を 7.5 ms で受ける実績があるのは nRF52840（本家の BLE 版、ZMK）で、ESP32-S3 の実例は同時 1〜2 台・15 ms にとどまる。D 案（M5Dial 単体）と H3 は経緯として残してある。
+決め手は、ユーザーが「**同時接続は 4 台まで、15 ms は許容できない**」と決めたこと。**その後、7.5 ms の実績の範囲に合わせて同時 2 台までに下げた（F1-3）。** 2 台なら D 案（M5Dial 単体）も実験次第で再評価できる（Q31）が、現時点の構成は E 案のまま。複数台を 7.5 ms で受ける公式の記載があるのは nRF52840（Nordic の参照実装で 3 台）。ESP32-S3 は、相手側が求めた 7.5 ms の 2 本の同居だけ実測例がある（prior-art.md「何台まで 7.5 ms の実績があるか」）。D 案（M5Dial 単体）と H3 は経緯として残してある。
 
 ### 次にやること（提案）
 
-1. **XIAO に本家の BLE 版を書き込み、手持ちの BLE 機器を 4 台までつないで、実際の接続間隔と報告数を測る**（Q28）。開発なしで、リマップ装置としてはこの時点で動く。
+1. **XIAO に本家の BLE 版を書き込み、手持ちの BLE キーボードとマウス（2 台）で実際の接続間隔と報告数を測る**（Q28）。本家はイベント長が既定の 7.5 ms なので、3.75 ms 以下に設定したビルドでも測る。リマップ装置としてはこの時点で動く。
+   - 並行して、初代 M5Dial で 2 台・7.5 ms を試せば、D 案に戻すかどうか判断できる（Q31）。
 2. M5Dial と XIAO の UART の通信仕様を決め（Q29）、接続状態とレイヤーの表示から作る。
 3. 機器ごとのレイヤー（F2-2）、ペアリング管理、設定セットなど、本家への改造を順に足す。改造は `techmech-keeb/hid-remapper`（public）ではなく、非公開の作業先を用意してから行う方針（development.md）。
 4. M5Dial の給電（Q30）と筐体。
@@ -52,7 +53,7 @@ finalized: false
 ## 5. そのほかの未解決事項
 
 - Q24：M5Dial V1.1（Stamp-S3A）の技適は未確認。公開時は動作確認した型番を明記する。手元の初代 M5Dial の技適表示も未確認。
-- Q28：XIAO で 4 台を 7.5 ms で受けられるか（実測）。Q29：M5Dial と XIAO の通信仕様。Q30：M5Dial への給電。
+- Q28：XIAO で 2 台を 7.5 ms で受けられるか（実測）。Q31：2 台なら D 案で 7.5 ms を満たせるか（実験）。Q29：M5Dial と XIAO の通信仕様。Q30：M5Dial への給電。
 - Q17 ライセンス、Q18 商標（Kensington の「Orbit®」など）。
 - naming.md：名前に「M5Stack」を入れない方針は提案で、ユーザーの確定は未記録。
 - M5Dial の給電：回路図上、Grove の 5 V は出力専用で給電不可。E 案では USB-C に筐体内で 5 V を入れる。
