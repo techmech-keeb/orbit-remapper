@@ -22,6 +22,7 @@ finalized: false
 8. [開発・文書運用案](development.md): 二つのリポジトリ、互換性、文書の確定方法。
 9. [類似プロジェクトの分析](prior-art.md): ESP32 で BLE キーボードを扱う先行例と、ESP-IDF の不具合。
 10. [命名記録](naming.md)、[出典](sources.md)。
+11. [Q31 実験の依頼書](q31-experiment-brief.md): M5Dial で BLE 機器 2 台を 7.5 ms で受けられるかを試す試験プログラムの仕様。
 
 ## 記録の確度
 

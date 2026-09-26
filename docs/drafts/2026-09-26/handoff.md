@@ -15,7 +15,7 @@ finalized: false
 3. [open-questions.md](open-questions.md) の Q24〜Q31 と、末尾の「回路図」「技適の調査」「Q21」「Q23」の節
 4. [architecture.md](architecture.md) の D 案・E 案・ESP32-S3 と nRF52840 の比較
 5. [prior-art.md](prior-art.md)（類似プロジェクトと、ESP-IDF の BLE の不具合）
-6. 必要に応じて [history.md](history.md)（経緯 1〜37）
+6. 必要に応じて [history.md](history.md)（経緯 1〜38）
 
 ## 2. リポジトリとブランチの状態
 
@@ -44,7 +44,7 @@ finalized: false
 
 ### 次にやること（提案）
 
-1. **初代 M5Dial で、手持ちの BLE キーボードとマウス（2 台）を 7.5 ms でつなげるか試す**（Q31）。接続を始める時点で 7.5 ms を指定し、実際の間隔を測る。結果で D 案か E 案かを決める。
+1. **初代 M5Dial で、手持ちの BLE キーボードとマウス（2 台）を 7.5 ms でつなげるか試す**（Q31）。試験プログラムは別の AI に作ってもらう予定で、仕様は [q31-experiment-brief.md](q31-experiment-brief.md)。接続を始める時点で 7.5 ms を指定し、実際の間隔を測る。結果で D 案か E 案かを決める。
 2. 比較用に、XIAO に本家の BLE 版を書き込み、同じ 2 台で間隔と報告数を測る（Q28）。本家はイベント長が既定の 7.5 ms なので、3.75 ms 以下に設定したビルドでも測る。
 3. E 案になった場合は、M5Dial と XIAO の UART の通信仕様を決め（Q29）、接続状態とレイヤーの表示から作る。
 4. 機器ごとのレイヤー（F2-2）、ペアリング管理、設定セットなど、本家への改造を順に足す。改造は `techmech-keeb/hid-remapper`（public）ではなく、非公開の作業先を用意してから行う方針（development.md）。
