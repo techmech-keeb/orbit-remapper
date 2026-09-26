@@ -44,3 +44,13 @@ finalized: false
 ## 未収録の過去資料
 
 CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得した成果物一式には収録されていません。初期〜E1の経緯は当時の引き継ぎ文書から把握できますが、元画像の再構成や寸法の推定で穴埋めしていません。E1採用画像はZIP内の原本をこのリポジトリに保存しています。
+
+## ESP-IDF のハブ対応（2026-09-26 確認）
+
+いずれも最終確認日 2026-09-26。公式資料の記載の確認で、実機では試していない。
+
+- esp-usb USB Host（ESP32-S3、latest）: https://docs.espressif.com/projects/esp-usb/en/latest/esp32s3/usb_host.html
+- ESP-IDF v5.5 USB Host（ESP32-S3）: https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/api-reference/peripherals/usb_host.html
+- ESP-IDF v5.4 USB Host（ESP32-S3）: https://docs.espressif.com/projects/esp-idf/en/v5.4/esp32s3/api-reference/peripherals/usb_host.html
+- esp-usb USB Host の変更履歴: https://github.com/espressif/esp-usb/blob/master/host/usb/CHANGELOG.md
+- esp-usb HID Host ドライバー README: https://github.com/espressif/esp-usb/blob/master/host/class/hid/usb_host_hid/README.md
