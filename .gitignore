@@ -1,0 +1,13 @@
+# 第三者の素材（再配布しない。artifacts/drafts/2026-09-26/e1-v0.3/references/README.md 参照）
+artifacts/drafts/2026-09-26/e1-v0.3/references/*.webp
+artifacts/drafts/2026-09-26/e1-v0.3/references/dimensions.png
+artifacts/drafts/2026-09-26/e1-v0.3/fonts/
+
+# 生成物（Release に添付する）
+artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/
+artifacts/drafts/2026-09-26/e1-v0.3/drawings/*.png
+artifacts/drafts/2026-09-26/e1-v0.3/drawings/mesh.json
+artifacts/drafts/2026-09-26/e1-v0.3/remapper_3d_viewer.html
+artifacts/drafts/2026-09-26/e1-v0.3/remapper_design_review.pdf
+
+__pycache__/

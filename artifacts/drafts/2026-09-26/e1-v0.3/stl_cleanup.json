@@ -1,0 +1,26 @@
+{
+  "01_upper_shell.stl": {
+    "removed_zero_area_triangles": 4,
+    "retained_triangles": 45022
+  },
+  "02_bottom.stl": {
+    "removed_zero_area_triangles": 0,
+    "retained_triangles": 11488
+  },
+  "03_display_carrier.stl": {
+    "removed_zero_area_triangles": 0,
+    "retained_triangles": 4786
+  },
+  "04_knob.stl": {
+    "removed_zero_area_triangles": 0,
+    "retained_triangles": 31312
+  },
+  "05_back_button.stl": {
+    "removed_zero_area_triangles": 0,
+    "retained_triangles": 1556
+  },
+  "06_reset_button.stl": {
+    "removed_zero_area_triangles": 0,
+    "retained_triangles": 1508
+  }
+}

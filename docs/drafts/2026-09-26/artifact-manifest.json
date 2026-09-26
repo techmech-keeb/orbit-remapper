@@ -1,0 +1,534 @@
+{
+ "status": "draft",
+ "snapshot_date": "2026-09-26",
+ "originals_unchanged": true,
+ "files": [
+  {
+   "path": "artifacts/drafts/2026-09-26/originals/remapper_3d_viewer.html",
+   "source_name": "remapper_3d_viewer.html",
+   "kind": "original",
+   "bytes": 3894002,
+   "sha256": "02fad9edc6cfecae71dc1955233d51ad56f051a7fe0d96050cf347c27696d25f",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/originals/remapper_bom_v0.3.xlsx",
+   "source_name": "remapper_bom_v0.3.xlsx",
+   "kind": "original",
+   "bytes": 14194,
+   "sha256": "316a51947fdc950b5fd773e8b487c9e515602101a4b7f8453f044d27395c27a2",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_bom_v0.3.xlsx"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.docx",
+   "source_name": "remapper_claude_handoff.docx",
+   "kind": "original",
+   "bytes": 2170702,
+   "sha256": "8728b2e6eb485ee05000ed82fe9339fa9e09deafd8fc7feb891ee0cdca980e53",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_claude_handoff.docx"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.md",
+   "source_name": "remapper_claude_handoff.md",
+   "kind": "original",
+   "bytes": 33251,
+   "sha256": "7bfe861dabfedae0fb4c1a52688e419156fe47728a698513fcce967ea1941a9c",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_claude_handoff.md"
+  },
+  {
+   "source_name": "remapper_design.zip",
+   "kind": "original",
+   "bytes": 12682545,
+   "sha256": "31b5897262b02171aeddb082dc264954cf1b9919503850c92f94a1f87ef0fa40",
+   "reconstruct_as": "artifacts/drafts/2026-09-26/originals/remapper_design.zip",
+   "storage": "split",
+   "parts": [
+    {
+     "path": "artifacts/drafts/2026-09-26/originals/remapper_design.zip.part01",
+     "bytes": 8388608,
+     "sha256": "feac992d325c9b430c48cdb8f4ffd103e56702b75c9e6700c7808b2522419e54"
+    },
+    {
+     "path": "artifacts/drafts/2026-09-26/originals/remapper_design.zip.part02",
+     "bytes": 4293937,
+     "sha256": "d5b587292c659fb0b7cbb8ce48deb79f30de5d5643d4af32c9a9cea51bcf5683"
+    }
+   ],
+   "location": "not-stored",
+   "location_note": "展開済みファイルと重複するため保存しない。分割部品は PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/originals/remapper_design_review.pdf",
+   "source_name": "remapper_design_review.pdf",
+   "kind": "original",
+   "bytes": 1088152,
+   "sha256": "2a99232d3e96b72cdc690fa4fe4095352b14efc39808accf65dab7244d58dd01",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_design_review.pdf"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/originals/remapper_preview.png",
+   "source_name": "remapper_preview.png",
+   "kind": "original",
+   "bytes": 117257,
+   "sha256": "cbb2d20ec1f0265b68142f536eb10b8f3c561cc817b7c783461c8f2511cc4140",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/README.md",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/README.md",
+   "kind": "extracted-original",
+   "bytes": 7570,
+   "sha256": "bd019b7cb61abed1f0452450e4a6f4e0f96f9e891da3d2aac011307f058033ff",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/build_report.py",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/build_report.py",
+   "kind": "extracted-original",
+   "bytes": 11968,
+   "sha256": "be59892245af99c7e53d078888f8f456fd26c121d29648bd179d206b2c5defee",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/build_viewer.py",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/build_viewer.py",
+   "kind": "extracted-original",
+   "bytes": 8897,
+   "sha256": "24aa0d3d5223334a685be9ff92a3afe82f01b481e8626fda479271dcebd1d414",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/01_upper_shell.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/01_upper_shell.step",
+   "kind": "extracted-original",
+   "bytes": 1803530,
+   "sha256": "4408cfb4f719094da56d41a402373a1e453fe6324e18b1b044d25e7c97159687",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/02_bottom.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/02_bottom.step",
+   "kind": "extracted-original",
+   "bytes": 239659,
+   "sha256": "bb7c3bb20a34f05b54929469316314f229fab294288972cde145e8730e3a0a48",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/03_display_carrier.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/03_display_carrier.step",
+   "kind": "extracted-original",
+   "bytes": 377662,
+   "sha256": "704f06eaa5aa723b908f958d71f2722b1465d799b0ba993cf92d5006802c1d44",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/04_knob.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/04_knob.step",
+   "kind": "extracted-original",
+   "bytes": 308114,
+   "sha256": "d3cd99e91698686dcbde586e6f872f323dccdeee75355cf909fbdd26e2580668",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/05_back_button.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/05_back_button.step",
+   "kind": "extracted-original",
+   "bytes": 66756,
+   "sha256": "7de2c358eb67f5a53735c22d7996b8c9951b43ea2613336416379735a494e6a4",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/06_reset_button.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/06_reset_button.step",
+   "kind": "extracted-original",
+   "bytes": 14497,
+   "sha256": "49b4777d6fb6b1edf66df927b9fc45f8f8b85fd38d5aee0b567bee04848f74c6",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_mechanical_envelope.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/PCB_mechanical_envelope.step",
+   "kind": "extracted-original",
+   "bytes": 128938,
+   "sha256": "213f09d293e9479327d219f434ac735d38e12a31c049da4984bc1310d2f88987",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_outline_NPTH.dxf",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/PCB_outline_NPTH.dxf",
+   "kind": "extracted-original",
+   "bytes": 19316,
+   "sha256": "ca90a76699c18803b06832ac80dbde9e362d18c1fe04d26df79e1d1690d99440",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/assembly_review.step",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/assembly_review.step",
+   "kind": "extracted-original",
+   "bytes": 3728242,
+   "sha256": "83a0b6b2d5bc3595a40f03d46c9c925de378461141e25844ee8346d1c692f386",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/build_model.py",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/build_model.py",
+   "kind": "extracted-original",
+   "bytes": 14048,
+   "sha256": "f75a7824dfb9993f347a981357877fe5144a29dc441c6027f4938e6bf64d778e",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/mesh_cleanup.py",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/mesh_cleanup.py",
+   "kind": "extracted-original",
+   "bytes": 890,
+   "sha256": "63edb5e167d8802eb34648474d26e31187c4f04fb695246f7c20b8591d943c41",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/parameters.json",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/parameters.json",
+   "kind": "extracted-original",
+   "bytes": 675,
+   "sha256": "9d33cf342e742e8205d92ee8ccdbaa80d48346b40236ac41242b730b7229eff9",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/verify_mesh.py",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/cad/verify_mesh.py",
+   "kind": "extracted-original",
+   "bytes": 932,
+   "sha256": "47c0e296a2382a7ff19205100196ed4acd9a23137d4adf1506f48401a042fc62",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/component_positions.csv",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/component_positions.csv",
+   "kind": "extracted-original",
+   "bytes": 2888,
+   "sha256": "b0a1f394a0671f74c1ac4f44a5424aba3fb8908286eb8758faffd1da03c10fe5",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/display_mount.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/display_mount.png",
+   "kind": "extracted-original",
+   "bytes": 39673,
+   "sha256": "5263169229866c90798f006c42ac1755e1354f9462462d8299c4b13c00d7a2bf",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/exploded.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/exploded.png",
+   "kind": "extracted-original",
+   "bytes": 123878,
+   "sha256": "9c75ab96be4ee501f7539633f18911404cfa58c1597fce510469c6d5600a7e3c",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/front.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/front.png",
+   "kind": "extracted-original",
+   "bytes": 80543,
+   "sha256": "3339eee6c69d2c44096765f22455f0875ebac3fd512e074d86ea281bff2d31a4",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/inside.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/inside.png",
+   "kind": "extracted-original",
+   "bytes": 62360,
+   "sha256": "92141c5b4255d3b14a4bdbdce3ae1af2335e61c459aaed9b5560eb22a2a59660",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/mesh.json",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/mesh.json",
+   "kind": "extracted-original",
+   "bytes": 3729110,
+   "sha256": "c5d3d8db40cdd85aaefeb8f0a1621806bf0be382a04be9312a74f4abf519373c",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/pcb_layout.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/pcb_layout.png",
+   "kind": "extracted-original",
+   "bytes": 146692,
+   "sha256": "228ffaa62cf937278a62421e2594a22ddce4e0d88cf8cae09cc921b76c9092f1",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/perspective.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/perspective.png",
+   "kind": "extracted-original",
+   "bytes": 117257,
+   "sha256": "cbb2d20ec1f0265b68142f536eb10b8f3c561cc817b7c783461c8f2511cc4140",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/rear.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/rear.png",
+   "kind": "extracted-original",
+   "bytes": 100010,
+   "sha256": "6f14336dff5566d58a85b763a04e7583ea1e6d8b37d1bb98850b55950990e2ea",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/render_views.py",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/render_views.py",
+   "kind": "extracted-original",
+   "bytes": 7574,
+   "sha256": "835cd8939b9748b60404ab66fb001599ce6b3fe03445bd2ecfb9ddb2aa38ce7d",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/side.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/drawings/side.png",
+   "kind": "extracted-original",
+   "bytes": 75517,
+   "sha256": "ffda29dd6a1464199ea245c460522c26938735e0073a884bb5d6bb168c734230",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/fit_checks.json",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/fit_checks.json",
+   "kind": "extracted-original",
+   "bytes": 2945,
+   "sha256": "696fbd17480317264a6f3a25dcbd3f17356b3ba62dc2b78dc28b1f558bfac8ae",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/fonts/IPA_Font_License_Agreement_v1.0.txt",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/fonts/IPA_Font_License_Agreement_v1.0.txt",
+   "kind": "extracted-original",
+   "bytes": 20564,
+   "sha256": "4c84dd528ec3044638ec346fc1ee27cd1eb95dfc04cbc6a881b3ca7a7f517e54",
+   "location": "not-stored",
+   "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/fonts/ipaexg.ttf",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/fonts/ipaexg.ttf",
+   "kind": "extracted-original",
+   "bytes": 6041284,
+   "sha256": "6726fb3c804e3fbc3ff5f45eddfd2fb1a858c2b1e03d3f1d8619bbca8d0a0ccd",
+   "location": "not-stored",
+   "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/mesh_checks.json",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/mesh_checks.json",
+   "kind": "extracted-original",
+   "bytes": 730,
+   "sha256": "ec890492b04db3616801d8aef460277449bcb854daa21e03e72d87a4b2cd0c24",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/01_upper_shell.stl",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/print_candidate/01_upper_shell.stl",
+   "kind": "extracted-original",
+   "bytes": 2251184,
+   "sha256": "f60f37344fd9ab457d9642de4933776a4e4d6709a7b5a30c662fd2b0391f4d5d",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/02_bottom.stl",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/print_candidate/02_bottom.stl",
+   "kind": "extracted-original",
+   "bytes": 574484,
+   "sha256": "e56076b0d11e7ef2995e277f803fbbeb60465e14fe29ebd81a111ec36b4939e8",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/03_display_carrier.stl",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/print_candidate/03_display_carrier.stl",
+   "kind": "extracted-original",
+   "bytes": 239384,
+   "sha256": "51d6f716d6c682223d6a1ec3869200fd6ff8b8bc8a272b0cdc4bd82d0aabe5ef",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/04_knob.stl",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/print_candidate/04_knob.stl",
+   "kind": "extracted-original",
+   "bytes": 1565684,
+   "sha256": "9595f6b855ce1e04e6b8c01b21ae2a109c7978ecc5f273b11538eae335c841b5",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/05_back_button.stl",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/print_candidate/05_back_button.stl",
+   "kind": "extracted-original",
+   "bytes": 77884,
+   "sha256": "613ca80af00d1a53c00c9dbf430b0cacabccb0f63d6b691ef706cb324906ff6d",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/06_reset_button.stl",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/print_candidate/06_reset_button.stl",
+   "kind": "extracted-original",
+   "bytes": 75484,
+   "sha256": "84aedf859f30e6534287554033f7c0aca07427f6fe2466593c50d9bf3e3f7691",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/detail.webp",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/references/detail.webp",
+   "kind": "extracted-original",
+   "bytes": 33074,
+   "sha256": "0fc2ee88e23fe3c85d376385b64dc126c958a65eb5bcfc3225ff2f25d7d61ccf",
+   "location": "not-stored",
+   "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/dimensions.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/references/dimensions.png",
+   "kind": "extracted-original",
+   "bytes": 287356,
+   "sha256": "af7533e74b36ff06704c9f16a40bcd76b796492e3d3802ad7a78f57eceb62a55",
+   "location": "not-stored",
+   "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/front.webp",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/references/front.webp",
+   "kind": "extracted-original",
+   "bytes": 94524,
+   "sha256": "a2075920824469ccd3c40fddfbd12170a232464f12342ee71e8b4d72f679121a",
+   "location": "not-stored",
+   "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/selected_E1_concept.png",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/references/selected_E1_concept.png",
+   "kind": "extracted-original",
+   "bytes": 2015933,
+   "sha256": "7b5b6a4461d053db70de90057857857a8ee60734ceb42bd8a86dbc1ca5b590aa",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/remapper_3d_viewer.html",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/remapper_3d_viewer.html",
+   "kind": "extracted-original",
+   "bytes": 3894002,
+   "sha256": "02fad9edc6cfecae71dc1955233d51ad56f051a7fe0d96050cf347c27696d25f",
+   "location": "release-pending",
+   "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/remapper_design_review.pdf",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/remapper_design_review.pdf",
+   "kind": "extracted-original",
+   "bytes": 1063177,
+   "sha256": "6c6b40da320407fd2445f15b2c8a23d01da2c3a7bf2497f110e70ccc2c5b3ef5",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/e1-v0.3/remapper_design_review.pdf"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/stl_cleanup.json",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/stl_cleanup.json",
+   "kind": "extracted-original",
+   "bytes": 598,
+   "sha256": "0529dd9623a8c3519937facf8b388500165a34441ad4751b042bd16ed8efe1d0",
+   "location": "orbit-remapper"
+  },
+  {
+   "path": "artifacts/drafts/2026-09-26/e1-v0.3/viewer_checks.json",
+   "source_name": "remapper_design.zip",
+   "archive_member": "remapper_design/viewer_checks.json",
+   "kind": "extracted-original",
+   "bytes": 220,
+   "sha256": "5d6eb5666f8c9e6452499dab13f4107f82848af8e2587ddbde466e1153e166d4",
+   "location": "orbit-remapper"
+  }
+ ],
+ "bom_reference_exports": [
+  {
+   "sheet": "BOM",
+   "path": "artifacts/drafts/2026-09-26/bom-reference/sheet-01.csv",
+   "bytes": 4922,
+   "sha256": "a2755944e018919e6962f278ef6e271e52735ef719f48d81992d35b8e4d9024c",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/bom-reference/sheet-01.csv"
+  },
+  {
+   "sheet": "変更履歴",
+   "path": "artifacts/drafts/2026-09-26/bom-reference/sheet-02.csv",
+   "bytes": 1015,
+   "sha256": "10e003e73680a8bcb5ee9d167924f7ccbb21b471fc0ea7d93e8f95fd14718451",
+   "location": "keyboard-hardware",
+   "private_path": "products/orbit-remapper/archive/2026-09-26/bom-reference/sheet-02.csv"
+  }
+ ],
+ "relocated": {
+  "date": "2026-09-26",
+  "reason": "将来の OSS 公開に備え、公開できる物だけを orbit-remapper に残した。非公開の原本は private の keyboard-hardware へ移した。",
+  "private_repository": "techmech-keeb/keyboard-hardware",
+  "original_branch": "docs/draft-design-record-20260926"
+ }
+}

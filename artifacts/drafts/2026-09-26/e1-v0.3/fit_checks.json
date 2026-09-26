@@ -1,0 +1,132 @@
+{
+  "parameters": {
+    "width": 104,
+    "depth": 87,
+    "body_top": 38,
+    "rear_plane_y": 35,
+    "wall_nominal": 2.4,
+    "pcb_width": 74,
+    "pcb_depth": 58,
+    "pcb_bottom": 6,
+    "pcb_thickness": 1.6,
+    "screen_angle": 65,
+    "screen_origin_y": 12,
+    "screen_origin_z": 17,
+    "glass2_drawing_width": 42,
+    "glass2_top_to_mount_centres": 44,
+    "glass2_ear_extension": 3,
+    "glass2_drawing_depth": 6.35,
+    "supplier_table_size": [
+      53,
+      42,
+      6
+    ],
+    "size_discrepancy_unresolved": true,
+    "bezel_width": 47.2,
+    "bezel_height": 32,
+    "bezel_aperture": [
+      37.4,
+      19.4
+    ],
+    "insert_pilot_M2": 3.1,
+    "insert_pilot_M2_5": 3.5,
+    "glass_sheet_size": [
+      42.04,
+      27.22,
+      1.25
+    ]
+  },
+  "parts": {
+    "01_upper_shell": {
+      "valid": true,
+      "solids": 1,
+      "volume_mm3": 39286.51,
+      "bbox_conservative_mm": [
+        116.61,
+        99.81,
+        67.68
+      ]
+    },
+    "02_bottom": {
+      "valid": true,
+      "solids": 1,
+      "volume_mm3": 14913.61,
+      "bbox_conservative_mm": [
+        98.67,
+        84.34,
+        8.32
+      ]
+    },
+    "03_display_carrier": {
+      "valid": true,
+      "solids": 1,
+      "volume_mm3": 5745.32,
+      "bbox_conservative_mm": [
+        60.0,
+        23.88,
+        44.99
+      ]
+    },
+    "04_knob": {
+      "valid": true,
+      "solids": 1,
+      "volume_mm3": 2410.9,
+      "bbox_conservative_mm": [
+        22.01,
+        22.01,
+        15.41
+      ]
+    },
+    "05_back_button": {
+      "valid": true,
+      "solids": 1,
+      "volume_mm3": 765.63,
+      "bbox_conservative_mm": [
+        14.0,
+        10.0,
+        20.1
+      ]
+    },
+    "06_reset_button": {
+      "valid": true,
+      "solids": 1,
+      "volume_mm3": 258.87,
+      "bbox_conservative_mm": [
+        8.0,
+        8.0,
+        17.0
+      ]
+    }
+  },
+  "collisions": [],
+  "notes": [
+    "Nominal CAD-envelope checks, not electrical routing, RF, tolerance-stack, strength or physical assembly validation.",
+    "Glass2 uses the published mechanical drawing: width42, top-to-mount44, ears3, depth6.35. Size-table53x42x6 remains unresolved; verify the physical unit before manufacture.",
+    "Glass2 full glass sheet is checked separately; rendered glass only fills the transparent aperture.",
+    "Insert pilot diameters, push travel and actual connector and shaft positions require first-article adjustment."
+  ],
+  "control_motion": {
+    "04_knob": {
+      "downward_travel_mm": 0.5,
+      "shell_overlap_mm3": 0.0,
+      "status": "clear"
+    },
+    "05_back_button": {
+      "downward_travel_mm": 0.6,
+      "shell_overlap_mm3": 0.0,
+      "status": "clear"
+    },
+    "06_reset_button": {
+      "downward_travel_mm": 0.4,
+      "shell_overlap_mm3": 0.0,
+      "status": "clear"
+    }
+  },
+  "plug_to_plug_overlap_mm3": 0.0,
+  "nominal_pa12_volume_cm3": 63.38,
+  "assembly_bbox_mm": [
+    104.0,
+    87.4,
+    61.25
+  ]
+}

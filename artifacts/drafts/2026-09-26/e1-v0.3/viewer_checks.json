@@ -1,0 +1,11 @@
+{
+  "javascript_syntax": "passed",
+  "view_states": [
+    "outside",
+    "inside",
+    "exploded",
+    "display"
+  ],
+  "mock_webgl_draw_calls": 325,
+  "actual_browser_rendering": "not tested; static fallback included"
+}

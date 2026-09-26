@@ -1,0 +1,37 @@
+{
+  "width": 104,
+  "depth": 87,
+  "body_top": 38,
+  "rear_plane_y": 35,
+  "wall_nominal": 2.4,
+  "pcb_width": 74,
+  "pcb_depth": 58,
+  "pcb_bottom": 6,
+  "pcb_thickness": 1.6,
+  "screen_angle": 65,
+  "screen_origin_y": 12,
+  "screen_origin_z": 17,
+  "glass2_drawing_width": 42,
+  "glass2_top_to_mount_centres": 44,
+  "glass2_ear_extension": 3,
+  "glass2_drawing_depth": 6.35,
+  "supplier_table_size": [
+    53,
+    42,
+    6
+  ],
+  "size_discrepancy_unresolved": true,
+  "bezel_width": 47.2,
+  "bezel_height": 32,
+  "bezel_aperture": [
+    37.4,
+    19.4
+  ],
+  "insert_pilot_M2": 3.1,
+  "insert_pilot_M2_5": 3.5,
+  "glass_sheet_size": [
+    42.04,
+    27.22,
+    1.25
+  ]
+}
