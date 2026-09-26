@@ -21,7 +21,24 @@ UART、電源、USB線の空間を予約した機械設計です。XIAO側のUAR
 
 XIAOを主処理、PicoをUSBホスト、M5Dial内のS3をUIとする三マイコン案。Pico側の既存ファーム流用を優先する選択肢です。部品・配線は増え、XIAOとUI間の通信実装は依然必要です。
 
-## C: M5Dial内のS3がUIとUSBホストを兼任 — **2026-09-26 採用**
+## D: M5Dial 単体（ESP32-S3 のみ）— **2026-09-26 採用**（requirements H3）
+
+| 部品 | 担当 |
+| --- | --- |
+| M5Dial の ESP32-S3 | BLE 機器の受信（ESP-IDF の BLE HID ホスト）、リマップ（本家コアを移植）、画面・タッチ・ダイヤル、PC への USB 出力（TinyUSB の機器側） |
+| M5Dial の USB-C | PC への接続と給電。パネル取付の延長ケーブルで筐体背面に出す |
+
+有線の USB 機器、XIAO、Pico、Grove の配線は使わない。検討の経緯は下の A〜C 案と requirements の H1〜H3。
+
+### D 案で詰めること
+
+- 本家コア（`remapper.cc` など）の ESP-IDF への移植。本家はコアをマイコン依存部から分けており、nRF52840（Zephyr）への移植実績がある。
+- PC 側 USB（レポート記述子、設定ツール用の窓口、boot protocol、リモートウェイクアップ）の TinyUSB への移植。
+- BLE HID ホスト：同時接続台数、再接続、遅延、LED の送り返し（F5）。
+- RAM：M5Dial は PSRAM なし（SRAM 512 KB）。BLE・USB・画面・コア処理を収める。Wi-Fi は使わない前提。
+- 技適：M5Dial V1.1 の技適を確認する（open-questions Q24）。
+
+## C: M5Dial内のS3がUIとUSBホストを兼任 — 2026-09-26 採用後、同日 D 案に置き換え
 
 | 部品 | 担当の提案 |
 | --- | --- |

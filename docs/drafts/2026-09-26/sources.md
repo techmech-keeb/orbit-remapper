@@ -54,3 +54,21 @@ CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得�
 - ESP-IDF v5.4 USB Host（ESP32-S3）: https://docs.espressif.com/projects/esp-idf/en/v5.4/esp32s3/api-reference/peripherals/usb_host.html
 - esp-usb USB Host の変更履歴: https://github.com/espressif/esp-usb/blob/master/host/usb/CHANGELOG.md
 - esp-usb HID Host ドライバー README: https://github.com/espressif/esp-usb/blob/master/host/class/hid/usb_host_hid/README.md
+
+## M5Dial の回路図と技適（2026-09-26 確認）
+
+いずれも最終確認日 2026-09-26。
+
+- M5Dial 回路図: https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/499/Sch_M5Dial.pdf
+- M5Stack Dial V1.1 公式資料: https://docs.m5stack.com/en/core/M5Dial%20V1.1
+- beekeeb XIAO nRF52840 Plus（技適 222-257139）: https://shop.beekeeb.jp/products/seeed-studio-xiao-nrf52840-plus
+- 秋月電子 XIAO BLE nRF52840（技適 211-220207）: https://akizukidenshi.com/catalog/g/g117341/
+- スイッチサイエンス M5Stack Dial v1.1: https://www.switch-science.com/products/10302
+- スイッチサイエンス M5StampS3A: https://www.switch-science.com/products/10377
+- 秋月電子 M5Stamp S3A: https://akizukidenshi.com/catalog/g/g131758/
+- マルツ M5Stack Dial v1.1: https://eleshop.jp/shop/g/gP4I31A/
+- Elecrow CrowPanel 1.28": https://www.elecrow.com/wiki/CrowPanel_1.28inch-HMI_ESP32_Rotary_Display.html
+- LilyGO T-Encoder Pro: https://github.com/Xinyuan-LilyGO/T-Encoder-Pro
+- Waveshare ESP32-S3-Knob-Touch-LCD-1.8: https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm
+- VIEWE 2.1" Knob Display: https://viewedisplay.com/product/esp32-2-1-inch-480x480-round-tft-knob-display-rotary-encoder-arduino-lvgl/
+

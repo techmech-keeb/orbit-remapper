@@ -20,7 +20,8 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2.
 
 | 構成 | 状態 |
 | --- | --- |
-| M5Dial + XIAO（S3がUIとUSBホストを兼任） | **2026-09-26 採用。** 透過表示の要件（R02）は取り下げ。対象製品リビジョン、通信、ファーム、筐体は未確定・未検証。 |
+| M5Dial 単体（ESP32-S3 が BLE 受信・リマップ・画面操作・PC への USB 出力） | **2026-09-26 採用。** 入力は BLE 機器のみ（有線 USB 機器は対象外）。透過表示の要件（R02）は取り下げ。技適（M5Dial V1.1）、ファーム、筐体は未確定・未検証。 |
+| M5Dial + XIAO（S3がUIとUSBホストを兼任） | 同日に検討し、M5Dial 単体の構成に置き換え。 |
 | E1 Orbital Pod + Glass2 + XIAO + Pico | 機構試作案v0.3のCAD等を経緯として保存。現行の構成ではない。 |
 
 ## リポジトリ
