@@ -1,0 +1,4 @@
+dependencies:
+  idf: ">=5.3"
+  # GC9A01 panel driver (Apache-2.0), fetched at build time into managed_components/.
+  espressif/esp_lcd_gc9a01: "^2.0.0"

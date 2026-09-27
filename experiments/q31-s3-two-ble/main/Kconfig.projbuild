@@ -1,0 +1,67 @@
+menu "Q31 experiment"
+
+    choice Q31_ITVL_MODE
+        prompt "How to request the connection interval"
+        default Q31_ITVL_AT_CONNECT
+        help
+            AT_CONNECT puts the interval into ble_gap_connect() (T1-T6).
+            AFTER_CONNECT connects with NimBLE's defaults and then calls
+            ble_gap_update_params() once encryption is up (T7).
+
+        config Q31_ITVL_AT_CONNECT
+            bool "In the connection request"
+        config Q31_ITVL_AFTER_CONNECT
+            bool "With a parameter update after connecting"
+    endchoice
+
+    config Q31_ITVL_UNITS
+        int "Requested connection interval (1.25 ms units)"
+        range 6 3200
+        default 6
+        help
+            Used as both itvl_min and itvl_max. 6 = 7.5 ms.
+
+    config Q31_SUPERVISION_TIMEOUT
+        int "Supervision timeout (10 ms units)"
+        range 10 3200
+        default 400
+
+    config Q31_CE_LEN
+        int "Connection event length, min and max (0.625 ms units, 0 = controller default)"
+        range 0 65535
+        default 0
+        help
+            Passed as min_ce_len and max_ce_len. Whether the ESP32-S3
+            controller honours it is part of what the experiment finds out.
+
+    choice Q31_PEER_UPDATE
+        prompt "Parameter updates requested by the device"
+        default Q31_PEER_UPDATE_KEEP_ITVL
+        help
+            Devices often ask for new parameters after connecting (ZMK asks
+            for 7.5-15 ms with latency 30, and NimBLE then picks 15 ms).
+            Every request is logged whichever option is chosen.
+
+        config Q31_PEER_UPDATE_KEEP_ITVL
+            bool "Accept, then ask again for our interval if the device allows it"
+            help
+                Accepts the request. If the device's range includes the
+                requested interval but the update landed elsewhere, asks once
+                for the requested interval with the device's latency and
+                timeout.
+        config Q31_PEER_UPDATE_ACCEPT
+            bool "Accept as requested"
+        config Q31_PEER_UPDATE_REJECT
+            bool "Reject (the device may disconnect)"
+    endchoice
+
+    config Q31_PKT_LOG
+        bool "Log ATT, SMP and L2CAP signalling packets (Q31 PKT lines)"
+        default y
+        help
+            Records opcodes (and a few non-secret header bytes) of every ATT,
+            SMP and L2CAP signalling packet to and from the devices, and
+            reports ATT requests from a device that we never answer.
+            Input report notifications are not listed.
+
+endmenu
