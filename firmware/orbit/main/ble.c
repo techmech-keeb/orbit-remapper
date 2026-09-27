@@ -41,6 +41,10 @@
 #define CONNECT_STUCK_CANCEL_US (15 * 1000000)
 #define CONNECT_STUCK_RESET_US  (25 * 1000000)
 #define ENC_WAIT_US (5 * 1000000)
+// The first GATT request on a link made right after the device dropped the
+// previous one sometimes gets no answer until the 30 s ATT timeout
+// (a195bc8 report, problem G'). A fresh link answers within 0.5 s.
+#define DISCOVERY_STALL_US (5 * 1000000)
 
 // Connection parameters requested in the connection request (q31-results.md
 // §5: asking after connecting is refused for the second device).
@@ -97,6 +101,7 @@ struct dev {
 
     bool discovering;
     bool discovery_finished;
+    int64_t discovery_progress_us; // last GATT callback of this link
     bool rediscover;       // encryption came up while discovering unencrypted
     bool peer_allows_itvl; // latest device request includes our interval
     bool reasserted;       // already asked again for our interval
@@ -140,6 +145,7 @@ static dev_t* gatt_ctx_dev(void* arg, uint16_t conn_handle) {
     if (!d->connected || d->conn_handle != conn_handle || c->gen != d->gen) {
         return NULL;
     }
+    d->discovery_progress_us = esp_timer_get_time();
     return d;
 }
 
@@ -335,6 +341,16 @@ static void periodic_check(struct ble_npl_event* ev) {
                 d->sec_pending = false;
                 EVT(d, "security started");
             }
+        }
+    }
+
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        dev_t* d = &devs[i];
+        if (d->connected && d->discovering && !d->discovery_finished &&
+            now - d->discovery_progress_us > DISCOVERY_STALL_US) {
+            EVT(d, "discovery stalled for %d s, dropping the link to retry", DISCOVERY_STALL_US / 1000000);
+            d->discovery_finished = true; // so this fires once
+            ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
         }
     }
 
@@ -702,6 +718,7 @@ static void start_discovery(dev_t* d) {
         return;
     }
     d->discovering = true;
+    d->discovery_progress_us = esp_timer_get_time();
     int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_HID_SERVICE), on_svc, d->ctx);
     if (rc != 0) {
         EVT(d, "service discovery start failed rc=0x%x", rc);
