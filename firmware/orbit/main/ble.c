@@ -474,6 +474,15 @@ static void discovery_done(dev_t* d) {
     EVT(d, "subscribed %d input report(s)", d->subscribed);
     if (d->rediscover) {
         restart_discovery_if_unsubscribed(d);
+        return;
+    }
+    if (d->subscribed == 0 && d->encrypted) {
+        // Discovery ran but found nothing to subscribe to (a failed or
+        // interrupted procedure). The link is useless as it is; drop it and
+        // let the reconnect discover afresh. Not the device's fault, so no
+        // 30 s avoidance.
+        EVT(d, "nothing subscribed, dropping the link to retry");
+        ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     }
 }
 
