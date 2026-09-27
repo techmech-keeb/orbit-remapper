@@ -155,13 +155,6 @@ static bool avoided(const ble_addr_t* addr) {
     return false;
 }
 
-// Drops the link and leaves the device alone for AVOID_US.
-static void give_up_on(dev_t* d, const char* why, int status) {
-    EVT(d, "%s, dropping the link and ignoring the device for %d s", why, AVOID_US / 1000000);
-    set_last_event("ENCFAIL", (int) (d - devs), status);
-    avoid_add(&d->addr);
-    ble_gap_terminate(d->conn_handle, BLE_ERR_AUTH_FAIL);
-}
 
 static int gap_event(struct ble_gap_event* event, void* arg);
 static void discover_next_report(dev_t* d);
@@ -193,6 +186,14 @@ static void set_last_event(const char* what, int slot, int status) {
 #define EVT(d, fmt, ...) \
     olog("M1 EVT t=%.3f D%d addr=..:%02x:%02x " fmt "\n", now_s(), (int) ((d) - devs), (d)->addr.val[1], \
          (d)->addr.val[0], ##__VA_ARGS__)
+
+// Drops the link and leaves the device alone for AVOID_US.
+static void give_up_on(dev_t* d, const char* why, int status) {
+    EVT(d, "%s, dropping the link and ignoring the device for %d s", why, AVOID_US / 1000000);
+    set_last_event("ENCFAIL", (int) (d - devs), status);
+    avoid_add(&d->addr);
+    ble_gap_terminate(d->conn_handle, BLE_ERR_AUTH_FAIL);
+}
 
 static void wake(void) {
     if (wake_task != NULL) {
