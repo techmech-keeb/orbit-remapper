@@ -23,6 +23,7 @@ finalized: false
 9. [類似プロジェクトの分析](prior-art.md): ESP32 で BLE キーボードを扱う先行例と、ESP-IDF の不具合。
 10. [命名記録](naming.md)、[出典](sources.md)。
 11. [Q31 実験の依頼書](q31-experiment-brief.md): M5Dial で BLE 機器 2 台を 7.5 ms で受けられるかを試す試験プログラムの仕様。
+12. [Q31 実験の結果](../2026-09-27/q31-results.md)（2026-09-27）: T1〜T7 の結果と、MD600 が 30 秒ごとに切れた原因。
 
 ## 記録の確度
 
