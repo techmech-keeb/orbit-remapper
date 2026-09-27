@@ -303,13 +303,14 @@ static void periodic_check(struct ble_npl_event* ev) {
         }
     }
 
-    // Some devices never finish encryption; subscribe anyway so the log
-    // shows whether they need it (the CCCD write then fails).
+    // A device that neither encrypts nor asks to pair within ENC_WAIT_US
+    // (one that lost its key but stays silent) would otherwise hold the slot
+    // until the 30 s SM timeout (0a0cfcf report). HOGP needs encryption, so
+    // an unencrypted link is of no use anyway.
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
-        if (d->connected && !d->encrypted && !d->discovering && now - d->connected_us > ENC_WAIT_US) {
-            EVT(d, "no encryption after %d s, discovering anyway", ENC_WAIT_US / 1000000);
-            start_discovery(d);
+        if (d->connected && !d->encrypted && now - d->connected_us > ENC_WAIT_US) {
+            give_up_on(d, "no encryption after 5 s", 0);
         }
     }
     start_scan();
