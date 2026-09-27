@@ -19,6 +19,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "soc/rtc_cntl_reg.h"
+#include "host/ble_hs.h"
 #include "tusb.h"
 
 #include "config.h"
@@ -27,6 +28,8 @@
 #include "platform.h"
 #include "remapper.h"
 
+#include "ble.h"
+#include "descriptor_parser.h"
 #include "display.h"
 #include "log.h"
 #include "orbit.h"
@@ -48,26 +51,59 @@ double orbit_now_s() {
     return esp_timer_get_time() / 1e6;
 }
 
+// M1 LAT: time from a device's notification arriving to the report that
+// followed it going to the PC on HID 0. The oldest report not yet followed by
+// a send is the reference; a report that produced no output (nothing mapped
+// changed) is dropped from the reference after LAT_STALE_US so it does not
+// inflate the next measurement.
+#define LAT_STALE_US 100000
+
+static portMUX_TYPE lat_mux = portMUX_INITIALIZER_UNLOCKED;
+static int64_t lat_pending_us;
+static struct {
+    uint32_t count, le8, le16, over16;
+    uint64_t sum_us;
+    uint32_t max_us;
+} lat;
+
+static void lat_note_received(int64_t t_us) {
+    if (lat_pending_us == 0 || t_us - lat_pending_us > LAT_STALE_US) {
+        lat_pending_us = t_us;
+    }
+}
+
 void orbit_report_sent() {
+    if (lat_pending_us == 0) {
+        return;
+    }
+    uint32_t d = (uint32_t) (esp_timer_get_time() - lat_pending_us);
+    lat_pending_us = 0;
+    portENTER_CRITICAL(&lat_mux);
+    lat.count++;
+    lat.sum_us += d;
+    if (d > lat.max_us) {
+        lat.max_us = d;
+    }
+    if (d <= 8000) {
+        lat.le8++;
+    } else if (d <= 16000) {
+        lat.le16++;
+    } else {
+        lat.over16++;
+    }
+    portEXIT_CRITICAL(&lat_mux);
 }
 
 void orbit_request_download_mode(const char* why) {
     download_mode_reason = why;
 }
 
-void pair_new_device() {
-    olog("M1 EVT t=%.3f pair_new_device: no Bluetooth in this build\n", orbit_now_s());
-}
-
-void clear_bonds() {
-    olog("M1 EVT t=%.3f clear_bonds: no Bluetooth in this build\n", orbit_now_s());
-}
-
 static void print_start() {
     olog("M1 START idf=%s app=%s upstream=%s config_size=%d descriptor=%u vid=%04x pid=%04x "
-         "lvgl_reserve=%s\n",
+         "max_devs=%d conn_itvl=6(7.50ms) lvgl_reserve=%s\n",
          esp_get_idf_version(), esp_app_get_description()->version, ORBIT_UPSTREAM_COMMIT,
-         PERSISTED_CONFIG_SIZE, our_descriptor_number, 0xCAFE, 0xBAF2, lvgl_reserve ? "ok" : "FAILED");
+         PERSISTED_CONFIG_SIZE, our_descriptor_number, 0xCAFE, 0xBAF2, ORBIT_MAX_DEVS,
+         lvgl_reserve ? "ok" : "FAILED");
 }
 
 // Upstream ticks the core once per millisecond (decision I2: esp_timer).
@@ -89,31 +125,82 @@ static void set_line(display_line_t* l, uint16_t color, const char* fmt, ...) {
 #define YELLOW DISPLAY_RGB(255, 255, 0)
 #define GREY   DISPLAY_RGB(160, 160, 160)
 
-// SUM line and screen, once a second, on CPU0 at low priority.
+// One line per device per second, e.g.
+// M1 DEV t=12 D0 addr=..:3a:5f h=1 itvl=6(7.50ms) lat=0 to=400 enc=1 subs=3 rpt=120 maxgap=9.1ms gaps<=8/16/32/>32=100/18/1/0 total=1440 disc=0
+static void report_device(int i, double t, const orbit_dev_stats_t* s, display_line_t* lines) {
+    if (!s->connected) {
+        olog("M1 DEV t=%.0f D%d none total=%lu disc=%lu\n", t, i, (unsigned long) s->total_reports,
+             (unsigned long) s->disconnects);
+        set_line(&lines[0], GREY, "D%d --", i);
+        set_line(&lines[1], GREY, " ");
+        return;
+    }
+    struct ble_gap_conn_desc desc = {};
+    ble_gap_conn_find(s->conn_handle, &desc);
+    double itvl_ms = desc.conn_itvl * 1.25;
+    olog("M1 DEV t=%.0f D%d addr=..:%02x:%02x h=%u itvl=%u(%.2fms) lat=%u to=%u enc=%d subs=%d "
+         "rpt=%lu maxgap=%.1fms gaps<=8/16/32/>32=%lu/%lu/%lu/%lu total=%lu disc=%lu\n",
+         t, i, s->addr_lo[1], s->addr_lo[0], s->conn_handle, desc.conn_itvl, itvl_ms, desc.conn_latency,
+         desc.supervision_timeout, s->encrypted, s->subscribed, (unsigned long) s->reports, s->max_gap_us / 1000.0,
+         (unsigned long) s->gaps[GAP_LE_8MS], (unsigned long) s->gaps[GAP_LE_16MS],
+         (unsigned long) s->gaps[GAP_LE_32MS], (unsigned long) s->gaps[GAP_OVER_32MS],
+         (unsigned long) s->total_reports, (unsigned long) s->disconnects);
+    uint16_t c = desc.conn_itvl == 6 ? GREEN : YELLOW;
+    set_line(&lines[0], c, "D%d %02X%02X %.2fMS", i, s->addr_lo[1], s->addr_lo[0], itvl_ms);
+    set_line(&lines[1], WHITE, "L%u %s S%d R%lu", desc.conn_latency, s->encrypted ? "ENC" : "RAW", s->subscribed,
+             (unsigned long) s->reports);
+}
+
+// SUM, DEV and LAT lines and the screen, once a second, on CPU0 at low priority.
 static void status_task(void* arg) {
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(1000));
+        orbit_ble_poll();
+        double t = orbit_now_s();
         bool mounted = tud_mounted();
         bool susp = tud_suspended();
-        olog("M1 SUM t=%.0f usb=%s boot_protocol=%d heap_free=%u heap_min=%u\n", orbit_now_s(),
+        int conn = orbit_ble_connected_count();
+        uint32_t lost = orbit_ble_take_lost();
+        olog("M1 SUM t=%.0f conn=%d/%d scan=%d pairing=%d usb=%s boot_protocol=%d heap_free=%u heap_min=%u"
+             "%s%lu\n",
+             t, conn, ORBIT_MAX_DEVS, orbit_ble_scanning(), orbit_ble_pairing(),
              !mounted ? "none" : susp ? "suspended" : "mounted", boot_protocol_keyboard,
-             (unsigned) esp_get_free_heap_size(), (unsigned) esp_get_minimum_free_heap_size());
+             (unsigned) esp_get_free_heap_size(), (unsigned) esp_get_minimum_free_heap_size(),
+             lost ? " lost=" : "", (unsigned long) lost);
 
         display_line_t lines[DISPLAY_ROWS] = {};
-        set_line(&lines[1], WHITE, "ORBIT M1");
-        set_line(&lines[2], GREY, "%s", esp_app_get_description()->version);
-        set_line(&lines[4], mounted && !susp ? GREEN : YELLOW, "USB %s",
-                 !mounted ? "--" : susp ? "SUSPEND" : "OK");
-        set_line(&lines[5], WHITE, "%s", boot_protocol_keyboard ? "BOOT KBD" : " ");
+        set_line(&lines[0], WHITE, "ORBIT M1 %s", esp_app_get_description()->version);
+        set_line(&lines[1], mounted && !susp ? GREEN : YELLOW, "USB %s %s", !mounted ? "--" : susp ? "SUSP" : "OK",
+                 boot_protocol_keyboard ? "BOOT" : "");
+        set_line(&lines[2], orbit_ble_pairing() ? YELLOW : WHITE, "%s %d/%d",
+                 orbit_ble_pairing() ? "PAIRING" : orbit_ble_scanning() ? "SCAN" : "IDLE", conn, ORBIT_MAX_DEVS);
+        orbit_dev_stats_t st;
+        for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+            orbit_ble_take_stats(i, &st);
+            report_device(i, t, &st, &lines[4 + i * 2]);
+        }
+
+        portENTER_CRITICAL(&lat_mux);
+        auto l = lat;
+        lat = {};
+        portEXIT_CRITICAL(&lat_mux);
+        if (l.count > 0) {
+            olog("M1 LAT t=%.0f n=%lu avg=%.2fms max=%.2fms <=8/<=16/>16=%lu/%lu/%lu\n", t, (unsigned long) l.count,
+                 l.sum_us / 1000.0 / l.count, l.max_us / 1000.0, (unsigned long) l.le8, (unsigned long) l.le16,
+                 (unsigned long) l.over16);
+            set_line(&lines[8], l.max_us <= 3000 ? GREEN : YELLOW, "LAT %.1f MAX%.1f", l.sum_us / 1000.0 / l.count,
+                     l.max_us / 1000.0);
+        }
+
         orbit_log_stats_t ls;
         orbit_log_get_stats(&ls);
-        set_line(&lines[6], ls.connected ? GREEN : GREY, "LOG %s %luK C%lu", ls.connected ? "DTR" : "--",
+        set_line(&lines[9], ls.connected ? GREEN : GREY, "LOG %s %luK C%lu", ls.connected ? "DTR" : "--",
                  (unsigned long) (ls.sent / 1024), (unsigned long) ls.completed);
-        if (ls.lost != 0) {
-            set_line(&lines[9], YELLOW, "LOG LOST %luK", (unsigned long) (ls.lost / 1024));
-        }
-        set_line(&lines[7], GREY, "HEAP %uK MIN %uK", (unsigned) (esp_get_free_heap_size() / 1024),
+        set_line(&lines[10], GREY, "HEAP %uK MIN %uK", (unsigned) (esp_get_free_heap_size() / 1024),
                  (unsigned) (esp_get_minimum_free_heap_size() / 1024));
+        char ev[DISPLAY_COLS + 1];
+        orbit_ble_last_event(ev, sizeof(ev));
+        set_line(&lines[11], GREY, "%s", ev);
         display_show(lines);
     }
 }
@@ -141,6 +228,26 @@ static void main_loop(void* arg) {
 
         tud_task_ext(0, false);
         orbit_log_pump();
+
+        // From the BLE task (decision I2: only this task calls the core).
+        orbit_disconnect_t disc;
+        while (orbit_ble_take_disconnect(&disc)) {
+            olog("M1 EVT t=%.3f D%u device_disconnected_callback\n", orbit_now_s(), disc.slot);
+            device_disconnected_callback(disc.slot);
+        }
+        static orbit_report_map_t map;
+        while (orbit_ble_take_report_map(&map)) {
+            // vid/pid 1/1 and itf_num 0, as upstream's Bluetooth build.
+            device_connected_callback(map.interface, 1, 1, map.hub_port);
+            parse_descriptor(1, 1, map.data, map.len, map.interface, 0);
+            olog("M1 EVT t=%.3f D%u descriptor parsed len=%u hub_port=%u\n", orbit_now_s(), map.interface >> 8,
+                 map.len, map.hub_port);
+        }
+        orbit_report_t rep;
+        if (orbit_ble_take_report(&rep)) {
+            lat_note_received(rep.t_us);
+            handle_received_report(rep.data, rep.len, rep.interface, rep.report_id);
+        }
 
         if (their_descriptor_updated) {
             update_their_descriptor_derivates();
@@ -229,5 +336,6 @@ extern "C" void app_main() {
     olog("M1 EVT t=%.3f config loaded from NVS err=0x%x (non-zero: defaults)\n", orbit_now_s(), cfg_err);
 
     xTaskCreatePinnedToCore(main_loop, "main_loop", 8192, NULL, 10, &main_task, 1);
-    xTaskCreatePinnedToCore(status_task, "status", 4096, NULL, 1, NULL, 0);
+    orbit_ble_start(main_task);
+    xTaskCreatePinnedToCore(status_task, "status", 5120, NULL, 1, NULL, 0);
 }

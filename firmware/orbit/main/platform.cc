@@ -17,6 +17,7 @@
 #include "platform.h"
 #include "remapper.h"
 
+#include "ble.h"
 #include "log.h"
 #include "orbit.h"
 #include "storage.h"
@@ -33,6 +34,15 @@ void reset_to_bootloader() {
 }
 
 void flash_b_side() {
+}
+
+// platform.h declares these with C++ linkage; the BLE code is C.
+void pair_new_device() {
+    orbit_ble_pair_new_device();
+}
+
+void clear_bonds() {
+    orbit_ble_clear_bonds();
 }
 
 void my_mutexes_init() {
