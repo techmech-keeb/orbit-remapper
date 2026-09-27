@@ -75,6 +75,8 @@ static uint8_t own_addr_type;
 static bool clear_bonds_on_sync;
 static bool connecting;
 static volatile bool scanning;
+static int last_scan_rc;
+static struct ble_npl_event scan_check_ev;
 static char last_event[24] = "START";
 
 static int gap_event(struct ble_gap_event *event, void *arg);
@@ -160,9 +162,16 @@ static void start_scan(void)
     if (rc == 0) {
         scanning = true;
         printf("Q31 EVT t=%.3f scan start\n", esp_timer_get_time() / 1e6);
-    } else {
-        ESP_LOGE(TAG, "scan start failed rc=%d", rc);
+    } else if (rc != last_scan_rc) {
+        // Retried every second by scan_check(), so only report changes.
+        printf("Q31 EVT t=%.3f scan start failed rc=0x%x hci=0x%02x\n", esp_timer_get_time() / 1e6, rc, hci(rc));
     }
+    last_scan_rc = rc;
+}
+
+static void scan_check(struct ble_npl_event *ev)
+{
+    start_scan();
 }
 
 static bool is_bonded(const ble_addr_t *addr)
@@ -626,7 +635,19 @@ void ble_central_start(bool clear_bonds)
     ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
 
     ble_store_config_init();
+    ble_npl_event_init(&scan_check_ev, scan_check, NULL);
     nimble_port_freertos_init(host_task);
+}
+
+void ble_central_poll(void)
+{
+    // start_scan() touches host state, so run it on the NimBLE host task.
+    ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &scan_check_ev);
+}
+
+bool ble_central_connecting(void)
+{
+    return connecting;
 }
 
 void ble_central_take_stats(int i, q31_dev_stats_t *out)

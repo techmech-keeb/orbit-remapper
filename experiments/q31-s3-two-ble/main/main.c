@@ -76,7 +76,7 @@ static void report_device(int i, double t, const q31_dev_stats_t *s, display_lin
     uint16_t c = desc.conn_itvl == CONFIG_Q31_ITVL_UNITS ? GREEN : YELLOW;
     set_line(&lines[0], c, "D%d %02X%02X %s", i, s->addr_lo[1], s->addr_lo[0], s->encrypted ? "ENC" : "RAW");
     set_line(&lines[1], c, "%.2fMS L%u T%u", itvl_ms, desc.conn_latency, desc.supervision_timeout * 10);
-    set_line(&lines[2], WHITE, "R%lu MAX%.1f", (unsigned long)s->reports, s->max_gap_us / 1000.0);
+    set_line(&lines[2], WHITE, "S%d R%lu MAX%.1f", s->subscribed, (unsigned long)s->reports, s->max_gap_us / 1000.0);
 }
 
 static void report_task(void *arg)
@@ -98,10 +98,13 @@ static void report_task(void *arg)
             connected += stats[i].connected;
         }
         bool scanning = ble_central_scanning();
-        printf("Q31 SUM t=%.0f conn=%d/%d scan=%d\n", t, connected, Q31_MAX_DEVS, scanning);
+        printf("Q31 SUM t=%.0f conn=%d/%d scan=%d connecting=%d\n", t, connected, Q31_MAX_DEVS, scanning,
+               ble_central_connecting());
+        ble_central_poll();
 
         set_line(&lines[1], WHITE, "Q31 %s", MODE_SHORT);
-        set_line(&lines[2], WHITE, "%s %d/%d T%.0f", scanning ? "SCAN" : "IDLE", connected, Q31_MAX_DEVS, t);
+        set_line(&lines[2], WHITE, "%s %d/%d T%.0f", scanning ? "SCAN" : ble_central_connecting() ? "CONN" : "IDLE",
+                 connected, Q31_MAX_DEVS, t);
         for (int i = 0; i < Q31_MAX_DEVS; i++) {
             report_device(i, t, &stats[i], &lines[4 + i * 4]);
         }

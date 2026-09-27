@@ -28,6 +28,11 @@ void ble_central_start(bool clear_bonds);
 void ble_central_take_stats(int i, q31_dev_stats_t *out);
 
 bool ble_central_scanning(void);
+bool ble_central_connecting(void);
+
+// Restarts scanning if a slot is free and nothing is scanning or connecting.
+// Call periodically; scanning can otherwise stay off after a failed start.
+void ble_central_poll(void);
 
 // Short description of the latest connection event, for the screen.
 void ble_central_last_event(char *buf, int len);

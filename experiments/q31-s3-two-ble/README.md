@@ -72,7 +72,7 @@ idf.py -B build-after -p <ポート> flash monitor
 
 ```text
 Q31 START idf=v5.5.5 app=<コミット> mode=at-connect itvl_req=6(7.50ms) to=400 ce_len=0 accept_peer_update=1 clear_bonds=0
-Q31 SUM t=12 conn=2/2 scan=0
+Q31 SUM t=12 conn=2/2 scan=0 connecting=0
 Q31 DEV t=12 D0 addr=..:3a:5f h=1 itvl=6(7.50ms) lat=0 to=400 enc=1 subs=3 rpt=120 maxgap=9.1ms gaps<=8/16/32/>32=100/18/1/0 total=1440 disc=0
 Q31 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
 ```
@@ -82,7 +82,7 @@ Q31 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
 | 行 | 出るとき | 内容 |
 | --- | --- | --- |
 | `START` | 起動時に 1 回 | ESP-IDF の版、プログラムの版（`git describe` の結果。コミットしていない変更があると `-dirty` が付く）、設定 |
-| `SUM` | 1 秒ごと | つながっている台数、探しているかどうか |
+| `SUM` | 1 秒ごと | つながっている台数、探しているか、接続を試みている最中か。空きがあるのにどちらでもなければ、探すのをやり直す（失敗したら `EVT` 行に `scan start failed` と理由が出る） |
 | `DEV` | 1 秒ごと、機器ごと | 下の表 |
 | `EVT` | そのつど | 接続、切断、接続条件の変更、機器からの変更要求、暗号化、通知の登録、失敗 |
 
@@ -102,7 +102,7 @@ Q31 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
 
 `EVT` 行の失敗の理由は、`status` や `reason` に NimBLE の値を、`hci=` に Bluetooth の規格で決まった番号を出す（`hci=-1` は Bluetooth の番号ではない失敗）。よく出そうなもの：`0x08` 通信が途絶えた、`0x13` 相手が切った、`0x16` こちらが切った、`0x3e` 接続を始められなかった、`0x12` 条件が不正（先例で 15 ms より短い要求を断られたときの値）。
 
-画面には同じ要点を出す：探しているか、台数、機器ごとのアドレスの下位・実際の間隔（緑＝要求どおり、黄＝違う）・latency・timeout（ミリ秒）・直近 1 秒の報告数と最大間隔、最後のイベント。
+画面には同じ要点を出す：探している（`SCAN`）／接続を試みている（`CONN`）／どちらでもない（`IDLE`）、台数、機器ごとのアドレスの下位・実際の間隔（緑＝要求どおり、黄＝違う）・latency・timeout（ミリ秒）・通知を登録できた数（`S`）・直近 1 秒の報告数（`R`）と最大間隔（`MAX`）、最後のイベント。
 
 ## 作りについて
 
