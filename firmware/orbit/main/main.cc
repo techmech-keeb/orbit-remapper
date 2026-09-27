@@ -208,7 +208,8 @@ extern "C" void app_main() {
     if (gpio_get_level((gpio_num_t) PIN_BUTTON) == 0) {
         display_init();
         show_download_mode();
-        orbit_enter_download_mode();
+        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+        esp_restart();
     }
 
     lvgl_reserve = heap_caps_malloc(LVGL_RESERVE_BYTES, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
