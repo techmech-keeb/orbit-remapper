@@ -262,7 +262,13 @@ bool do_send_report(uint8_t interface, const uint8_t* report_with_id, uint8_t le
 
 static usb_phy_handle_t phy;
 
+// The ROM and the bootloader have already shown the USB Serial/JTAG to the
+// PC. Unplug it cleanly before the same pins come back as the HID device.
+#define USJ_TO_APP_DETACH_MS 200
+
 void orbit_usb_init() {
+    orbit_usj_detach(USJ_TO_APP_DETACH_MS);
+
     usb_phy_config_t phy_conf = {};
     phy_conf.controller = USB_PHY_CTRL_OTG;
     phy_conf.target = USB_PHY_TARGET_INT;

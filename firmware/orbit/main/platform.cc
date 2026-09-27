@@ -8,6 +8,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "hal/usb_serial_jtag_ll.h"
 #include "nvs.h"
 #include "soc/rtc_cntl_reg.h"
@@ -85,11 +86,36 @@ void queue_set_feature_report(uint16_t interface, uint8_t report_id, const uint8
 void queue_get_feature_report(uint16_t interface, uint8_t report_id, uint8_t len) {
 }
 
+// How long the bus stays idle before the port reappears in download mode.
+// Through a hub a quick detach and reattach was not recognised (A1 report,
+// 2026-09-27); the value is a guess.
+#define DOWNLOAD_MODE_DETACH_MS 500
+
+void orbit_usj_detach(int ms) {
+    const usb_serial_jtag_pull_override_vals_t detached = {
+        .dp_pu = false,
+        .dm_pu = false,
+        .dp_pd = true,
+        .dm_pd = true,
+    };
+    usb_serial_jtag_ll_phy_enable_pull_override(&detached);
+    vTaskDelay(pdMS_TO_TICKS(ms));
+}
+
+void orbit_usj_attach() {
+    usb_serial_jtag_ll_phy_disable_pull_override();
+}
+
 void orbit_enter_download_mode() {
     // Route the internal USB PHY back from the OTG controller (TinyUSB) to the
-    // USB Serial/JTAG, which the ROM's download mode talks through.
+    // USB Serial/JTAG, which the ROM's download mode talks through. Keep the
+    // bus idle for a while, then attach and reboot at once: the USB
+    // Serial/JTAG enumerates in hardware and stays up across esp_restart().
+    orbit_usj_detach(0);
     usb_serial_jtag_ll_phy_enable_external(false);
     usb_serial_jtag_ll_phy_enable_pad(true);
+    vTaskDelay(pdMS_TO_TICKS(DOWNLOAD_MODE_DETACH_MS));
+    orbit_usj_attach();
     REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
     esp_restart();
 }
