@@ -235,6 +235,14 @@ void tud_resume_cb() {
     olog("M1 EVT t=%.3f usb resumed\n", orbit_now_s());
 }
 
+// Third way back to flashing, needing neither the config tool nor the
+// button: open the log port at 1200 bps (the Arduino "1200 bps touch").
+void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding) {
+    if (p_line_coding->bit_rate == 1200) {
+        orbit_request_download_mode("log port opened at 1200 bps");
+    }
+}
+
 // Same as upstream's USB build (firmware/src/main.cc), plus the send time
 // for the M1 LAT line.
 bool do_send_report(uint8_t interface, const uint8_t* report_with_id, uint8_t len) {
