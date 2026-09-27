@@ -81,6 +81,7 @@ typedef struct {
     bool encrypted;
     bool repaired; // already retried pairing after the device lost our bond
     int64_t connected_us;
+    bool sec_pending; // ble_gap_security_initiate() failed, retry from periodic_check()
 
     bool discovering;
     bool discovery_finished;
@@ -289,6 +290,17 @@ static void periodic_check(struct ble_npl_event* ev) {
         int rc = ble_gap_conn_cancel();
         olog("M1 EVT t=%.3f connect attempt stuck for %d s, cancel rc=0x%x\n", now_s(),
              (int) ((now - connecting_since_us) / 1000000), rc);
+    }
+
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        dev_t* d = &devs[i];
+        if (d->connected && d->sec_pending) {
+            int rc = ble_gap_security_initiate(d->conn_handle);
+            if (rc == 0) {
+                d->sec_pending = false;
+                EVT(d, "security started");
+            }
+        }
     }
 
     // Some devices never finish encryption; subscribe anyway so the log
@@ -737,11 +749,12 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         // (prior-art.md §4.29), so start it ourselves.
         int rc = ble_gap_security_initiate(d->conn_handle);
         if (rc != 0) {
-            // Seen as rc=0x6 while a previous link to the same device was
-            // still being torn down (09b3075 report); unencrypted the link
-            // would only occupy the slot.
-            give_up_on(d, "security start failed", rc);
-            return 0;
+            // NimBLE runs one pairing/encryption procedure at a time
+            // (BLE_SM_MAX_PROCS = 1), so this fails with rc=0x6 while the
+            // other device is pairing (0a0cfcf report). Not the device's
+            // fault: retry from periodic_check().
+            EVT(d, "security start failed rc=0x%x, retrying", rc);
+            d->sec_pending = true;
         }
         start_scan();
         return 0;
