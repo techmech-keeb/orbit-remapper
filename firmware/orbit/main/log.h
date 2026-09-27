@@ -28,6 +28,7 @@ typedef struct {
     bool connected;      // DTR set by the terminal
     uint32_t sent;       // bytes handed to the CDC interface
     uint32_t lost;       // bytes dropped because the buffer was full
+    uint32_t completed;  // CDC IN transfers the PC has taken (tud_cdc_tx_complete_cb)
 } orbit_log_stats_t;
 
 void orbit_log_get_stats(orbit_log_stats_t* out);

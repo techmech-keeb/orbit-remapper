@@ -32,12 +32,16 @@
 #define ITF_CDC      2 // + data interface 3
 #define ITF_COUNT    4
 
+// The ESP32-S3's USB controller has TX FIFOs for IN endpoints 0-4 only
+// (TinyUSB's dwc2_esp32.h: ep_in_count = 5, and it gives IN endpoint N
+// FIFO N). With the CDC data IN on 0x85 nothing was ever sent on it
+// (728105c report), so keep every IN endpoint number at 4 or below.
 #define EP_HID0_IN   0x81
-#define EP_HID0_OUT  0x02
-#define EP_HID1_IN   0x83
-#define EP_CDC_NOTIF 0x84
-#define EP_CDC_OUT   0x05
-#define EP_CDC_IN    0x85
+#define EP_HID0_OUT  0x01
+#define EP_HID1_IN   0x82
+#define EP_CDC_NOTIF 0x83
+#define EP_CDC_OUT   0x04
+#define EP_CDC_IN    0x84
 
 #define STR_CDC 4
 

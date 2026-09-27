@@ -13,6 +13,7 @@
 static char ring[RING_SIZE];
 static size_t head, tail; // free-running byte counters
 static uint32_t lost_pending, lost_total, sent_total;
+static volatile uint32_t tx_completed;
 static volatile bool connected;
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 static orbit_log_connect_cb_t connect_cb;
@@ -106,12 +107,19 @@ void orbit_log_pump(void)
     tud_cdc_write_flush();
 }
 
+// Runs from tud_task(), i.e. on the main loop.
+void tud_cdc_tx_complete_cb(uint8_t itf)
+{
+    tx_completed++;
+}
+
 void orbit_log_get_stats(orbit_log_stats_t* out)
 {
     portENTER_CRITICAL(&mux);
     out->connected = connected;
     out->sent = sent_total;
     out->lost = lost_total;
+    out->completed = tx_completed;
     portEXIT_CRITICAL(&mux);
 }
 

@@ -107,8 +107,8 @@ static void status_task(void* arg) {
         set_line(&lines[5], WHITE, "%s", boot_protocol_keyboard ? "BOOT KBD" : " ");
         orbit_log_stats_t ls;
         orbit_log_get_stats(&ls);
-        set_line(&lines[6], ls.connected ? GREEN : GREY, "LOG %s %luK", ls.connected ? "DTR" : "--",
-                 (unsigned long) (ls.sent / 1024));
+        set_line(&lines[6], ls.connected ? GREEN : GREY, "LOG %s %luK C%lu", ls.connected ? "DTR" : "--",
+                 (unsigned long) (ls.sent / 1024), (unsigned long) ls.completed);
         if (ls.lost != 0) {
             set_line(&lines[9], YELLOW, "LOG LOST %luK", (unsigned long) (ls.lost / 1024));
         }
