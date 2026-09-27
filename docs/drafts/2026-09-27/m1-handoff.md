@@ -12,7 +12,8 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 - M1 は**途中**。依頼書 [m1-brief.md](m1-brief.md) の 4.1（PC 側の USB と書き込みモードへの戻り方）まで作った。**Bluetooth の受信（4.2）、`LAT` などのログ（4.6）、画面（4.5）の本番はまだ。**
 - 合格条件 A1（書き込みモードに戻れる）は、版 `3662016` で**合格**した。ただし PC 本体のポートにつないだときだけで、USB ハブ経由では失敗した（§4）。
-- 版 `1e37eea` で、**ログが届く・ボタン＋RST・1200 bps の 3 つとも合格**した（§4.3）。ログの経路と書き込みモードへの戻り方は安定した。次は依頼書 4.2（Bluetooth の受信）と 4.6（`DEV`・`LAT`）。
+- 版 `1e37eea` で、**ログが届く・ボタン＋RST・1200 bps の 3 つとも合格**した（§4.3）。
+- 最新の **`86a2d16`** に Bluetooth の受信（依頼書 4.2）、`DEV`・`LAT` 行（4.6）、画面の機器表示（4.5）が入り、依頼書の「作るもの」は一通りそろった。**実機では未確認。** 次は A2〜A10 の試験（§6）。使い方とログの読み方は `firmware/orbit/README.md`。
 
 ## 2. 役割の分け方
 
@@ -40,6 +41,7 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 | `59559e3` | この引き継ぎ文書 |
 | `b2e7ad7` | `db94be3` の取り消し。ボタン＋RST の経路は `3662016` と同じに戻った |
 | `1e37eea` | USB の送信口（IN endpoint）の番号を 0x84 以下に収める。画面に CDC の転送完了数 `C` を出す |
+| `86a2d16` | Bluetooth の受信（`main/ble.c`）、主ループのキュー、`DEV`・`LAT` 行、画面の機器表示 |
 
 - 本家コアは**無改造**（`// ORBIT:` の印のある変更はゼロ）。ESP-IDF の警告の設定だけ、コアのファイルに対して緩めた（`-Wno-narrowing -Wno-missing-field-initializers`）。
 
@@ -109,7 +111,24 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 6. 次にやること
 
-### 6.1 すぐにやる：版 `1e37eea` の確認（利用者と Desktop）
+### 6.1 すぐにやる：版 `86a2d16` で A2〜A4、A7〜A10（利用者と Desktop）
+
+書き込み用のファイルは `orbit-m1-86a2d16-ble.bin`（SHA-256 `8f921c2b7a4ad221ccefde92ba99d25ef1f5df54e270e0ab1e832ce2b09403b0`）。アドレス `0x0`。NVS はアプリの後ろにあるが、この版から NimBLE のペアリング情報を持ち始めるので、初回は**ペアリング待ち**（画面 `PAIRING 0/2`）で起動する。機器側の Orbit のペアリングは、Q31 のものが残っていれば消してからペアリングし直す。
+
+順番：
+1. ログに `START`（`max_devs=2 conn_itvl=6(7.50ms)` 入り）と `SUM`（`conn=`、`heap_`）が出る。
+2. **A2**：MD600 をペアリング待ちにして、つながる（`EVT` の `connected itvl=6`、`encryption on`、`report map N byte(s)`、`subscribed N input report(s)`、`descriptor parsed`）。キーを打つと PC に届き、`DEV` の `rpt` が増え、`LAT` 行が出る。次に設定ツール（https://www.remapper.org/config/ ）で **Pair new device** を押してから meteorite40 をペアリング待ちにする（1 台つながった後は、ペアリング済みの機器しか探さない）。2 台とも `itvl=6(7.50ms) lat=0`。
+3. **A3**：設定ツールで本体が見え、割り当てを変えて Save、再起動後も残る（`EVT` に `config saved err=0x0`）。
+4. **A4**：Pair new device（2 で確認済み）、Clear bonds（`EVT` に `clear_bonds rc=0x0`、両方切れて `PAIRING` に戻る）、Reset to bootloader（`EVT` に `entering download mode (config tool)`、VID 303A）。
+5. **A8**：`LAT` の `max` が 3 ms 以内か。超えるなら `avg` と分布も記録。
+6. **A9**：`SUM` の `heap_min` が 50 KB（51200）以上か。
+7. **A7**：2 台を動かし続けて 10 分。`DEV` の `disc` と `itvl`。
+8. **A10**：電源の入れ直し、スリープからの復帰で、自動でつなぎ直す。
+9. **A5**（BIOS）、**A6**（PC のスリープ解除）は利用者の PC の都合で。A6 は `EVT` の `usb suspended`、`remote_wakeup sent/refused` を見る。
+
+**動かないときに見るところ**：`subs=0`（通知を登録できていない）、`descriptor parsed` が出ない（Report Map を読めていない）、`SUM` の `lost=`（キューあふれ）、`LOG LOST`。
+
+### 6.2 参考：版 `1e37eea` の確認（済み）
 
 書き込み用のファイルは `orbit-m1-1e37eea-A1-usb-only.bin`（SHA-256 `f92b1235c1e4b76a7f93d431c7fac012b94bcdfefa0c7118041a82a0602b5aa2`）。アドレス `0x0` に書き込む。**PC 本体のポートにつないで書き込む。** いま入っている `728105c` はボタン＋RST で PC から見えなくなるので、書き込みモードに入るには **PC を再起動せずに、ケーブルを抜き差ししてから**ボタン＋RST を試す（抜き差しで直るかは未確認。直らなければ PC の再起動）。
 
@@ -119,12 +138,10 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 4. ハブ経由は後回し（未解決のまま）。
 4. 結果を §7 の形でまとめ、クラウドのセッションに渡す。
 
-### 6.2 その後（クラウドのセッションが作る）
+### 6.3 その後（クラウドのセッションが作る）
 
-- 依頼書 4.2：Bluetooth の受信。Q31 の `experiments/q31-s3-two-ble/main/ble_central.c` が種（接続を始める時点で 7.5 ms、GATT サーバー有効、自分から暗号化、`esp_hidh` を使わない）。これに Report Map の読み出し、報告のキュー（時刻付き）、`pair_new_device()`・`clear_bonds()` を足す。いまの `main.cc` にある `pair_new_device()` と `clear_bonds()` は、ログを出すだけの仮のもの。
-- 依頼書 4.6：`DEV`・`LAT` 行、`SUM` に接続台数。4.5：画面に接続台数と接続間隔。
-- A2〜A10 の試験。A9（空きメモリ）は、Bluetooth を入れた版で測る。いまの 210 KB は判定に使えない。
-- 設計の記録の直し（§8）。
+- A2〜A10 の結果を受けた直し。
+- 結果の文書（依頼書 §5 の表を埋める）、設計の記録の直し（§8）、PR の仕上げ。
 
 ## 7. 報告の書き方（クラウドのセッションへ渡すとき）
 
