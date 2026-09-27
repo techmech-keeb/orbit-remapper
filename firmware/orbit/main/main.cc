@@ -51,34 +51,40 @@ double orbit_now_s() {
     return esp_timer_get_time() / 1e6;
 }
 
-// M1 LAT: time from a device's notification arriving to the report that
-// followed it going to the PC on HID 0. The oldest report not yet followed by
-// a send is the reference; a report that produced no output (nothing mapped
-// changed) is dropped from the reference after LAT_STALE_US so it does not
-// inflate the next measurement.
-#define LAT_STALE_US 100000
+// M1 LAT: time from a device's notification arriving to a report going to
+// the PC on HID 0. The core does not say which input caused an output, so the
+// reference is the most recent notification handed to the core. A send more
+// than LAT_UNRELATED_US after the last notification (auto-repeat, macros,
+// tap/hold timing) is counted as "unrelated" instead of as latency. Earlier
+// (6254d16) the oldest unsent notification was the reference, which turned
+// reports that changed nothing into multiples of 7.5 ms.
+#define LAT_UNRELATED_US 20000
 
 static portMUX_TYPE lat_mux = portMUX_INITIALIZER_UNLOCKED;
-static int64_t lat_pending_us;
+static int64_t lat_last_rx_us;
 static struct {
-    uint32_t count, le8, le16, over16;
+    uint32_t count, le8, le16, over16, unrelated;
     uint64_t sum_us;
     uint32_t max_us;
 } lat;
 
 static void lat_note_received(int64_t t_us) {
-    if (lat_pending_us == 0 || t_us - lat_pending_us > LAT_STALE_US) {
-        lat_pending_us = t_us;
-    }
+    lat_last_rx_us = t_us;
 }
 
 void orbit_report_sent() {
-    if (lat_pending_us == 0) {
+    if (lat_last_rx_us == 0) {
         return;
     }
-    uint32_t d = (uint32_t) (esp_timer_get_time() - lat_pending_us);
-    lat_pending_us = 0;
+    int64_t d64 = esp_timer_get_time() - lat_last_rx_us;
+    lat_last_rx_us = 0;
     portENTER_CRITICAL(&lat_mux);
+    if (d64 > LAT_UNRELATED_US) {
+        lat.unrelated++;
+        portEXIT_CRITICAL(&lat_mux);
+        return;
+    }
+    uint32_t d = (uint32_t) d64;
     lat.count++;
     lat.sum_us += d;
     if (d > lat.max_us) {
@@ -185,10 +191,10 @@ static void status_task(void* arg) {
         auto l = lat;
         lat = {};
         portEXIT_CRITICAL(&lat_mux);
-        if (l.count > 0) {
-            olog("M1 LAT t=%.0f n=%lu avg=%.2fms max=%.2fms <=8/<=16/>16=%lu/%lu/%lu\n", t, (unsigned long) l.count,
-                 l.sum_us / 1000.0 / l.count, l.max_us / 1000.0, (unsigned long) l.le8, (unsigned long) l.le16,
-                 (unsigned long) l.over16);
+        if (l.count > 0 || l.unrelated > 0) {
+            olog("M1 LAT t=%.0f n=%lu avg=%.2fms max=%.2fms <=8/<=16/>16=%lu/%lu/%lu unrelated=%lu\n", t,
+                 (unsigned long) l.count, l.count ? l.sum_us / 1000.0 / l.count : 0.0, l.max_us / 1000.0,
+                 (unsigned long) l.le8, (unsigned long) l.le16, (unsigned long) l.over16, (unsigned long) l.unrelated);
             set_line(&lines[8], l.max_us <= 3000 ? GREEN : YELLOW, "LAT %.1f MAX%.1f", l.sum_us / 1000.0 / l.count,
                      l.max_us / 1000.0);
         }
@@ -333,7 +339,8 @@ extern "C" void app_main() {
     display_init();
     orbit_log_init(print_start);
     print_start();
-    olog("M1 EVT t=%.3f config loaded from NVS err=0x%x (non-zero: defaults)\n", orbit_now_s(), cfg_err);
+    olog("M1 EVT t=%.3f config loaded from NVS err=0x%x%s\n", orbit_now_s(), cfg_err,
+         cfg_err == ESP_OK ? "" : " (using defaults)");
 
     xTaskCreatePinnedToCore(main_loop, "main_loop", 8192, NULL, 10, &main_task, 1);
     orbit_ble_start(main_task);
