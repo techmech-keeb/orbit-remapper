@@ -123,7 +123,10 @@ static const uint8_t* configuration_descriptors[] = {
 static const char* string_desc_arr[] = {
     (const char[]){ 0x09, 0x04 }, // 0: English (0x0409)
     "Orbit (ESP32-S3)",           // 1: Manufacturer
-    "HID Remapper XXXX",          // 2: Product; XXXX is filled from the unique ID, as upstream
+    // "Bluetooth" in the product name is what makes upstream's web config tool
+    // show "Pair new device" and "Forget all devices" (config-tool-web/code.js).
+    // XXXX is filled from the unique ID, as upstream's USB build does.
+    "HID Remapper Bluetooth XXXX",
     "123456789012",               // 3: Serial number, filled from the unique ID
     "Orbit log",                  // 4: CDC interface
 };
