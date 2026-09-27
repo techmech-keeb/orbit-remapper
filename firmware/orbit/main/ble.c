@@ -744,7 +744,15 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         }
         d->encrypted = event->enc_change.status == 0;
         EVT(d, "encryption %s status=0x%x", d->encrypted ? "on" : "failed", event->enc_change.status);
-        if (d->encrypted) {
+        if (!d->encrypted) {
+            // Usually the device still holds keys from an earlier pairing that
+            // we no longer have. Keeping the link would only block a slot
+            // (6254d16 report); drop it, and the device can pair afresh.
+            set_last_event("ENCFAIL", (int) (d - devs), hci(event->enc_change.status));
+            ble_gap_terminate(d->conn_handle, BLE_ERR_AUTH_FAIL);
+            return 0;
+        }
+        {
             peers_only = true; // as upstream: back to bonded devices only after a successful pairing
             if (d->discovering) {
                 // Subscribing before encryption may have failed; retry once it is up.
