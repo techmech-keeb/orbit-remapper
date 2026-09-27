@@ -8,6 +8,14 @@ finalized: false
 
 M1 を作っているクラウドのセッションから、利用者の PC で動く Claude Desktop のセッションへ引き継ぐための文書。会話は日本語、平易な表現で、結論を先に書く。事実（実機やログで見た値）と推測を分け、確かめていないことは「未確認」と書く。
 
+## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
+
+- 直した版 **`6254d16`** の `orbit-m1-6254d16-ble.bin` を、利用者が受け取っている。アドレス `0x0` に書き込む（書き込みモードへは 1200 bps かボタン＋RST）。
+- 直したのは 2 点：USB の製品名を `HID Remapper Bluetooth XXXX` にした（設定ツールに Pair new device / Forget all devices が出るようにするため）。`SUM` の `heap_min` の表示の不具合（`lost=` の `0` が後ろに付いていた。本当の最小値は約 97 KB）。
+- やること：§6.1 の順番（1 → 9）。特に、書き込み後に MD600 が自動でつながるか（NVS が残る初めての確認）と、設定ツールの Pair new device で meteorite40 を足せるか。
+- 報告の形は §7。`M1` の行を全部ファイルに残す。困ったら §6.1 末尾の「動かないときに見るところ」。
+- クラウドのセッションとローカルのセッションは直接はやり取りできない。**報告は利用者がクラウドのセッションに貼り、直しはこの文書と `.bin` で返ってくる。**
+
 ## 1. 結論（2026-09-27 時点）
 
 - M1 は**途中**。依頼書 [m1-brief.md](m1-brief.md) の 4.1（PC 側の USB と書き込みモードへの戻り方）まで作った。**Bluetooth の受信（4.2）、`LAT` などのログ（4.6）、画面（4.5）の本番はまだ。**
@@ -122,15 +130,13 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ### 6.1 すぐにやる：製品名を直した版で A2 後半〜A10（利用者と Desktop）
 
-書き込み用のファイルは §6.0 の直しの後の版（クラウドのセッションが渡す。`START` 行の `app=` で確かめる）。手順は下のとおり（`86a2d16` 向けに書いたものと同じ）。
-
-書き込み用のファイルは `orbit-m1-86a2d16-ble.bin`（SHA-256 `8f921c2b7a4ad221ccefde92ba99d25ef1f5df54e270e0ab1e832ce2b09403b0`）。アドレス `0x0`。NVS はアプリの後ろにあるが、この版から NimBLE のペアリング情報を持ち始めるので、初回は**ペアリング待ち**（画面 `PAIRING 0/2`）で起動する。機器側の Orbit のペアリングは、Q31 のものが残っていれば消してからペアリングし直す。
+書き込み用のファイルは `orbit-m1-6254d16-ble.bin`（SHA-256 `36b6702fea5e0191e4e5992b7614c8c44a8cbe8fa770a5f34bd8f857de742ab6`）。アドレス `0x0`。書き込みモードへは 1200 bps かボタン＋RST で入る。NVS はアプリの後ろなので、`86a2d16` で作った MD600 のペアリング情報と設定は**残る見込み**（初めての確認）。
 
 順番：
-1. ログに `START`（`max_devs=2 conn_itvl=6(7.50ms)` 入り）と `SUM`（`conn=`、`heap_`）が出る。
-2. **A2**：MD600 をペアリング待ちにして、つながる（`EVT` の `connected itvl=6`、`encryption on`、`report map N byte(s)`、`subscribed N input report(s)`、`descriptor parsed`）。キーを打つと PC に届き、`DEV` の `rpt` が増え、`LAT` 行が出る。次に設定ツール（https://www.remapper.org/config/ ）で **Pair new device** を押してから meteorite40 をペアリング待ちにする（1 台つながった後は、ペアリング済みの機器しか探さない）。2 台とも `itvl=6(7.50ms) lat=0`。
+1. 書き込み後 RST。ログに `START`（`app=6254d16`）と `SUM`（`heap_min` が 10 万前後の正しい値、`lost=0`）。**MD600 が自動でつながる**か（`ble ready bonds=1` → `scan start (bonded devices only)` → `connected`）。つながらなければ NVS が消えている：`bonds=0` と `PAIRING` を報告し、MD600 をペアリングし直す。
+2. **A2 後半**：設定ツール（https://www.remapper.org/config/ 、Chrome）で本体を開く。製品名が `HID Remapper Bluetooth ...` で、Actions に **Pair new device** が出ることを確かめる。押してから meteorite40 をペアリング待ちにする（1 台つながった後は、ペアリング済みの機器しか探さない）。2 台とも `itvl=6(7.50ms) lat=0`、トラックボールとキーが PC で動く。
 3. **A3**：設定ツールで本体が見え、割り当てを変えて Save、再起動後も残る（`EVT` に `config saved err=0x0`）。
-4. **A4**：Pair new device（2 で確認済み）、Clear bonds（`EVT` に `clear_bonds rc=0x0`、両方切れて `PAIRING` に戻る）、Reset to bootloader（`EVT` に `entering download mode (config tool)`、VID 303A）。
+4. **A4**：Pair new device（2 で確認済み）、Forget all devices（`EVT` に `clear_bonds rc=0x0`、両方切れて `PAIRING` に戻る。機器側でもペアリングを消してやり直す）、Flash firmware（= Reset to bootloader。`EVT` に `entering download mode (config tool)`、VID 303A。戻るときは RST）。
 5. **A8**：`LAT` の `max` が 3 ms 以内か。超えるなら `avg` と分布も記録。
 6. **A9**：`SUM` の `heap_min` が 50 KB（51200）以上か。
 7. **A7**：2 台を動かし続けて 10 分。`DEV` の `disc` と `itvl`。
