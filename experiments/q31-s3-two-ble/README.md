@@ -45,7 +45,7 @@ idf.py -B build-after -p <ポート> flash monitor
 | Requested connection interval | 6（7.5 ms） | 1.25 ms 単位 |
 | Supervision timeout | 400（4 秒） | 10 ms 単位。この時間通信がなければ切断とみなす |
 | Connection event length | 0（コントローラーの既定） | 1 回の通信に使う時間の長さ（0.625 ms 単位）。ESP32-S3 がこの値に従うかどうかも未確認 |
-| Accept parameter updates requested by the device | 有効 | 機器から接続条件の変更を求められたときに受けるかどうか。無効にすると断る（機器が切断することがある）。どちらでも要求の内容はログに出す |
+| Parameter updates requested by the device | Accept, then ask again for our interval if the device allows it | 機器から接続条件の変更を求められたときの扱い。既定では受けたうえで、機器が示した範囲に要求の間隔（7.5 ms）が入っていれば、latency と timeout は機器の希望のまま、間隔だけ 7.5 ms にするよう 1 回だけ求め直す（`EVT` 行に `asking for it again`）。meteorite40 は、そのまま受ける動作の版で 15 ms・latency 30 になった（2026-09-27、画面で確認）。ZMK の既定の希望「7.5〜15 ms、latency 30」を受けて NimBLE が 15 ms を選んだと見ているが、要求の中身はログで要確認。ほかに「そのまま受ける」「断る（機器が切断することがある）」を選べる。どれでも要求の内容はログに出す |
 
 ## 使い方
 
@@ -71,7 +71,7 @@ idf.py -B build-after -p <ポート> flash monitor
 ログはすべて `Q31` で始まる。`grep '^Q31'` で抜き出せる。時刻 `t` は起動からの秒数。
 
 ```text
-Q31 START idf=v5.5.5 app=<コミット> mode=at-connect itvl_req=6(7.50ms) to=400 ce_len=0 accept_peer_update=1 clear_bonds=0
+Q31 START idf=v5.5.5 app=<コミット> mode=at-connect itvl_req=6(7.50ms) to=400 ce_len=0 peer_update=keep-itvl clear_bonds=0
 Q31 SUM t=12 conn=2/2 scan=0 connecting=0
 Q31 DEV t=12 D0 addr=..:3a:5f h=1 itvl=6(7.50ms) lat=0 to=400 enc=1 subs=3 rpt=120 maxgap=9.1ms gaps<=8/16/32/>32=100/18/1/0 total=1440 disc=0
 Q31 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)

@@ -20,10 +20,12 @@
 
 #define REPORT_PERIOD_US 1000000
 
-#if CONFIG_Q31_ACCEPT_PEER_UPDATE
-#define ACCEPT_PEER_UPDATE 1
+#if CONFIG_Q31_PEER_UPDATE_KEEP_ITVL
+#define PEER_UPDATE "keep-itvl"
+#elif CONFIG_Q31_PEER_UPDATE_ACCEPT
+#define PEER_UPDATE "accept"
 #else
-#define ACCEPT_PEER_UPDATE 0
+#define PEER_UPDATE "reject"
 #endif
 
 #define WHITE  DISPLAY_RGB(255, 255, 255)
@@ -134,11 +136,11 @@ void app_main(void)
     display_init();
 
     // Everything needed to reproduce the run goes into the first line of the log.
-    printf("Q31 START idf=%s app=%s mode=%s itvl_req=%d(%.2fms) to=%d ce_len=%d accept_peer_update=%d "
+    printf("Q31 START idf=%s app=%s mode=%s itvl_req=%d(%.2fms) to=%d ce_len=%d peer_update=%s "
            "clear_bonds=%d\n",
            esp_get_idf_version(), esp_app_get_description()->version, MODE_NAME, CONFIG_Q31_ITVL_UNITS,
            CONFIG_Q31_ITVL_UNITS * 1.25, CONFIG_Q31_SUPERVISION_TIMEOUT, CONFIG_Q31_CE_LEN,
-           ACCEPT_PEER_UPDATE, clear_bonds);
+           PEER_UPDATE, clear_bonds);
 
     ble_central_start(clear_bonds);
 

@@ -23,10 +23,10 @@
 #define CONNECT_TIMEOUT_MS 10000
 #define ENC_WAIT_US (5 * 1000000)
 
-#if CONFIG_Q31_ACCEPT_PEER_UPDATE
-#define ACCEPT_PEER_UPDATE 1
-#else
+#if CONFIG_Q31_PEER_UPDATE_REJECT
 #define ACCEPT_PEER_UPDATE 0
+#else
+#define ACCEPT_PEER_UPDATE 1
 #endif
 
 // Provided by NimBLE's NVS-backed store; it has no public header.
@@ -53,6 +53,8 @@ typedef struct {
     bool discovering;
     bool discovery_finished;
     bool rediscover; // encryption came up while discovering unencrypted
+    bool peer_allows_itvl; // latest device request includes our interval
+    bool reasserted;       // already asked again for our interval
 
     // GATT discovery
     uint16_t svc_start[MAX_HID_SVCS];
@@ -478,6 +480,7 @@ static void on_report(dev_t *d)
 
 static int on_update_request(dev_t *d, const char *kind, const struct ble_gap_upd_params *peer)
 {
+    d->peer_allows_itvl = peer->itvl_min <= CONFIG_Q31_ITVL_UNITS && CONFIG_Q31_ITVL_UNITS <= peer->itvl_max;
     EVT(d, "%s from device itvl=%u-%u(%.2f-%.2fms) lat=%u to=%u -> %s", kind, peer->itvl_min, peer->itvl_max,
         ms(peer->itvl_min), ms(peer->itvl_max), peer->latency, peer->supervision_timeout,
         ACCEPT_PEER_UPDATE ? "accept" : "reject");
@@ -558,6 +561,23 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         } else {
             print_params(d, "updated");
             set_last_event("UPD", (int)(d - devs), -1);
+#if CONFIG_Q31_PEER_UPDATE_KEEP_ITVL
+            struct ble_gap_conn_desc desc;
+            if (d->peer_allows_itvl && !d->reasserted && ble_gap_conn_find(d->conn_handle, &desc) == 0 &&
+                desc.conn_itvl != CONFIG_Q31_ITVL_UNITS) {
+                d->reasserted = true;
+                const struct ble_gap_upd_params upd = {
+                    .itvl_min = CONFIG_Q31_ITVL_UNITS,
+                    .itvl_max = CONFIG_Q31_ITVL_UNITS,
+                    .latency = desc.conn_latency,
+                    .supervision_timeout = desc.supervision_timeout,
+                    .min_ce_len = CONFIG_Q31_CE_LEN,
+                    .max_ce_len = CONFIG_Q31_CE_LEN,
+                };
+                int rc = ble_gap_update_params(d->conn_handle, &upd);
+                EVT(d, "device allows %.2fms, asking for it again rc=0x%x", ms(CONFIG_Q31_ITVL_UNITS), rc);
+            }
+#endif
         }
         return 0;
 

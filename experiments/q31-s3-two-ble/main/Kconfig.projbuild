@@ -34,12 +34,25 @@ menu "Q31 experiment"
             Passed as min_ce_len and max_ce_len. Whether the ESP32-S3
             controller honours it is part of what the experiment finds out.
 
-    config Q31_ACCEPT_PEER_UPDATE
-        bool "Accept parameter updates requested by the device"
-        default y
+    choice Q31_PEER_UPDATE
+        prompt "Parameter updates requested by the device"
+        default Q31_PEER_UPDATE_KEEP_ITVL
         help
-            When disabled, update requests from the device are rejected, so
-            the connection keeps the interval this program asked for (the
-            device may then disconnect). Either way the request is logged.
+            Devices often ask for new parameters after connecting (ZMK asks
+            for 7.5-15 ms with latency 30, and NimBLE then picks 15 ms).
+            Every request is logged whichever option is chosen.
+
+        config Q31_PEER_UPDATE_KEEP_ITVL
+            bool "Accept, then ask again for our interval if the device allows it"
+            help
+                Accepts the request. If the device's range includes the
+                requested interval but the update landed elsewhere, asks once
+                for the requested interval with the device's latency and
+                timeout.
+        config Q31_PEER_UPDATE_ACCEPT
+            bool "Accept as requested"
+        config Q31_PEER_UPDATE_REJECT
+            bool "Reject (the device may disconnect)"
+    endchoice
 
 endmenu
