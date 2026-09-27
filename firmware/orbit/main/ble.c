@@ -72,9 +72,21 @@ typedef struct {
     uint8_t report_type;
 } chr_t;
 
+typedef struct dev dev_t;
+
+// Handed to NimBLE as the callback argument of every GATT procedure. A
+// procedure of a link that has since gone (and whose conn_handle the next
+// link may reuse) is told apart by the generation.
 typedef struct {
+    dev_t* d;
+    uint32_t gen;
+} gatt_ctx_t;
+
+struct dev {
     // Connection state; slot is in use when connecting or connected.
     bool in_use;
+    uint32_t gen;      // bumped on every connect and disconnect
+    gatt_ctx_t* ctx;   // context of this link's GATT procedures
     bool connected;
     uint16_t conn_handle;
     ble_addr_t addr;
@@ -108,7 +120,28 @@ typedef struct {
     uint32_t gaps[GAP_BUCKETS];
     uint32_t total_reports;
     uint32_t disconnects;
-} dev_t;
+};
+
+// Stale procedures die within the 30 s ATT timeout, so a small ring suffices.
+static gatt_ctx_t gatt_ctxs[8];
+static unsigned gatt_ctx_next;
+
+static gatt_ctx_t* new_gatt_ctx(dev_t* d) {
+    gatt_ctx_t* c = &gatt_ctxs[gatt_ctx_next++ % (sizeof(gatt_ctxs) / sizeof(gatt_ctxs[0]))];
+    c->d = d;
+    c->gen = d->gen;
+    return c;
+}
+
+// True when the callback belongs to the link the slot currently holds.
+static dev_t* gatt_ctx_dev(void* arg, uint16_t conn_handle) {
+    gatt_ctx_t* c = arg;
+    dev_t* d = c->d;
+    if (!d->connected || d->conn_handle != conn_handle || c->gen != d->gen) {
+        return NULL;
+    }
+    return d;
+}
 
 static const char* TAG = "ble";
 static dev_t devs[ORBIT_MAX_DEVS];
@@ -381,10 +414,13 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     }
     scanning = false;
 
+    uint32_t gen = d->gen + 1;
     portENTER_CRITICAL(&stats_mux);
     memset(d, 0, offsetof(dev_t, total_reports)); // keep the slot's running totals
+    d->gen = gen;
     d->addr = disc->addr;
     portEXIT_CRITICAL(&stats_mux);
+    d->ctx = new_gatt_ctx(d);
 
     const struct ble_gap_conn_params params = {
         .scan_itvl = 0x10,
@@ -443,9 +479,9 @@ static void discovery_done(dev_t* d) {
 
 static int on_cccd_written(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
                            void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0) {
@@ -461,9 +497,9 @@ static int on_cccd_written(uint16_t conn_handle, const struct ble_gatt_error* er
 
 static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
                          void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0 && attr->om != NULL && OS_MBUF_PKTLEN(attr->om) >= 2) {
@@ -477,7 +513,7 @@ static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* erro
     }
     if (c->report_type == REPORT_TYPE_INPUT && (c->props & BLE_GATT_CHR_PROP_NOTIFY) && c->cccd_handle != 0) {
         static const uint8_t notify_on[2] = { 0x01, 0x00 };
-        int rc = ble_gattc_write_flat(conn_handle, c->cccd_handle, notify_on, sizeof(notify_on), on_cccd_written, d);
+        int rc = ble_gattc_write_flat(conn_handle, c->cccd_handle, notify_on, sizeof(notify_on), on_cccd_written, d->ctx);
         if (rc == 0) {
             return 0;
         }
@@ -490,9 +526,9 @@ static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* erro
 
 static int on_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint16_t chr_val_handle,
                   const struct ble_gatt_dsc* dsc, void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0) {
@@ -504,7 +540,7 @@ static int on_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint
         return 0;
     }
     if (error->status == BLE_HS_EDONE && c->ref_handle != 0) {
-        int rc = ble_gattc_read(conn_handle, c->ref_handle, on_report_ref, d);
+        int rc = ble_gattc_read(conn_handle, c->ref_handle, on_report_ref, d->ctx);
         if (rc == 0) {
             return 0;
         }
@@ -527,7 +563,7 @@ static void discover_next_report(dev_t* d) {
         }
         c->cccd_handle = 0;
         c->ref_handle = 0;
-        int rc = ble_gattc_disc_all_dscs(d->conn_handle, c->val_handle, c->end_handle, on_dsc, d);
+        int rc = ble_gattc_disc_all_dscs(d->conn_handle, c->val_handle, c->end_handle, on_dsc, d->ctx);
         if (rc == 0) {
             return;
         }
@@ -538,9 +574,9 @@ static void discover_next_report(dev_t* d) {
 
 static int on_report_map(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
                          void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     orbit_report_map_t* m = &d->report_map;
     if (error->status == 0 && attr->om != NULL) {
@@ -572,9 +608,9 @@ static void discover_next_svc_chrs(dev_t* d);
 
 static int on_chr(uint16_t conn_handle, const struct ble_gatt_error* error, const struct ble_gatt_chr* chr,
                   void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     if (error->status == 0) {
         if (d->n_chrs < MAX_CHRS) {
@@ -607,7 +643,7 @@ static int on_chr(uint16_t conn_handle, const struct ble_gatt_error* error, cons
 
 static void discover_next_svc_chrs(dev_t* d) {
     if (d->cur_svc < d->n_svcs) {
-        int rc = ble_gattc_disc_all_chrs(d->conn_handle, d->svc_start[d->cur_svc], d->svc_end[d->cur_svc], on_chr, d);
+        int rc = ble_gattc_disc_all_chrs(d->conn_handle, d->svc_start[d->cur_svc], d->svc_end[d->cur_svc], on_chr, d->ctx);
         if (rc == 0) {
             return;
         }
@@ -616,7 +652,7 @@ static void discover_next_svc_chrs(dev_t* d) {
     // All characteristics known: read the Report Map, then set up each Report.
     d->report_map.len = 0;
     if (d->report_map_handle != 0) {
-        int rc = ble_gattc_read_long(d->conn_handle, d->report_map_handle, 0, on_report_map, d);
+        int rc = ble_gattc_read_long(d->conn_handle, d->report_map_handle, 0, on_report_map, d->ctx);
         if (rc == 0) {
             return;
         }
@@ -630,9 +666,9 @@ static void discover_next_svc_chrs(dev_t* d) {
 
 static int on_svc(uint16_t conn_handle, const struct ble_gatt_error* error, const struct ble_gatt_svc* svc,
                   void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     if (error->status == 0) {
         if (d->n_svcs < MAX_HID_SVCS) {
@@ -657,7 +693,7 @@ static void start_discovery(dev_t* d) {
         return;
     }
     d->discovering = true;
-    int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_HID_SERVICE), on_svc, d);
+    int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_HID_SERVICE), on_svc, d->ctx);
     if (rc != 0) {
         EVT(d, "service discovery start failed rc=0x%x", rc);
     }
@@ -775,6 +811,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         portENTER_CRITICAL(&stats_mux);
         d->connected = false;
         d->in_use = false;
+        d->gen++;
         d->disconnects++;
         portEXIT_CRITICAL(&stats_mux);
         {
