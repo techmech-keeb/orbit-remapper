@@ -161,12 +161,13 @@ static void status_task(void* arg) {
         bool susp = tud_suspended();
         int conn = orbit_ble_connected_count();
         uint32_t lost = orbit_ble_take_lost();
-        olog("M1 SUM t=%.0f conn=%d/%d scan=%d pairing=%d usb=%s boot_protocol=%d heap_free=%u heap_min=%u"
-             "%s%lu\n",
+        // Internal RAM only (A9). The M5Dial has no PSRAM, but say so explicitly.
+        unsigned heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        unsigned heap_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        olog("M1 SUM t=%.0f conn=%d/%d scan=%d pairing=%d usb=%s boot_protocol=%d heap_free=%u heap_min=%u lost=%lu\n",
              t, conn, ORBIT_MAX_DEVS, orbit_ble_scanning(), orbit_ble_pairing(),
-             !mounted ? "none" : susp ? "suspended" : "mounted", boot_protocol_keyboard,
-             (unsigned) esp_get_free_heap_size(), (unsigned) esp_get_minimum_free_heap_size(),
-             lost ? " lost=" : "", (unsigned long) lost);
+             !mounted ? "none" : susp ? "suspended" : "mounted", boot_protocol_keyboard, heap_free, heap_min,
+             (unsigned long) lost);
 
         display_line_t lines[DISPLAY_ROWS] = {};
         set_line(&lines[0], WHITE, "ORBIT M1 %s", esp_app_get_description()->version);
@@ -196,8 +197,7 @@ static void status_task(void* arg) {
         orbit_log_get_stats(&ls);
         set_line(&lines[9], ls.connected ? GREEN : GREY, "LOG %s %luK C%lu", ls.connected ? "DTR" : "--",
                  (unsigned long) (ls.sent / 1024), (unsigned long) ls.completed);
-        set_line(&lines[10], GREY, "HEAP %uK MIN %uK", (unsigned) (esp_get_free_heap_size() / 1024),
-                 (unsigned) (esp_get_minimum_free_heap_size() / 1024));
+        set_line(&lines[10], GREY, "HEAP %uK MIN %uK", heap_free / 1024, heap_min / 1024);
         char ev[DISPLAY_COLS + 1];
         orbit_ble_last_event(ev, sizeof(ev));
         set_line(&lines[11], GREY, "%s", ev);
