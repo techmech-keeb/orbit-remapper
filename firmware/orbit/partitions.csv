@@ -1,0 +1,6 @@
+# Name,   Type, SubType, Offset,   Size
+# NVS (pairing keys and the remapper config) sits after the app so that
+# writing the single merged image at 0x0 does not erase it (q31-results.md §7).
+factory,  app,  factory, 0x10000,  0x3F0000
+nvs,      data, nvs,     0x400000, 0x20000
+phy_init, data, phy,     0x420000, 0x1000
