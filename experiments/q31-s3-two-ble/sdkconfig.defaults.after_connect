@@ -1,0 +1,3 @@
+# T7: connect with NimBLE's default parameters, then ask for 7.5 ms with
+# ble_gap_update_params(). Layered on top of sdkconfig.defaults.
+CONFIG_Q31_ITVL_AFTER_CONNECT=y
