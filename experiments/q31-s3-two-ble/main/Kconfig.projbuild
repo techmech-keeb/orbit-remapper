@@ -55,4 +55,13 @@ menu "Q31 experiment"
             bool "Reject (the device may disconnect)"
     endchoice
 
+    config Q31_PKT_LOG
+        bool "Log ATT, SMP and L2CAP signalling packets (Q31 PKT lines)"
+        default y
+        help
+            Records opcodes (and a few non-secret header bytes) of every ATT,
+            SMP and L2CAP signalling packet to and from the devices, and
+            reports ATT requests from a device that we never answer.
+            Input report notifications are not listed.
+
 endmenu

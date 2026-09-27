@@ -648,6 +648,13 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         }
         return 0;
 
+    case BLE_GAP_EVENT_MTU:
+        d = dev_by_handle(event->mtu.conn_handle);
+        if (d != NULL) {
+            EVT(d, "mtu=%u", event->mtu.value);
+        }
+        return 0;
+
     case BLE_GAP_EVENT_NOTIFY_RX:
         d = dev_by_handle(event->notify_rx.conn_handle);
         if (d != NULL) {

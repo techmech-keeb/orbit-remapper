@@ -14,6 +14,9 @@
 #include "nvs_flash.h"
 #include "ble_central.h"
 #include "display.h"
+#if CONFIG_Q31_PKT_LOG
+#include "pkt_log.h"
+#endif
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
 #define PIN_BUTTON     42 // screen push button, low when pressed
@@ -26,6 +29,12 @@
 #define PEER_UPDATE "accept"
 #else
 #define PEER_UPDATE "reject"
+#endif
+
+#if CONFIG_Q31_PKT_LOG
+#define PKT_LOG 1
+#else
+#define PKT_LOG 0
 #endif
 
 #define WHITE  DISPLAY_RGB(255, 255, 255)
@@ -137,11 +146,14 @@ void app_main(void)
 
     // Everything needed to reproduce the run goes into the first line of the log.
     printf("Q31 START idf=%s app=%s mode=%s itvl_req=%d(%.2fms) to=%d ce_len=%d peer_update=%s "
-           "clear_bonds=%d\n",
+           "pkt_log=%d clear_bonds=%d\n",
            esp_get_idf_version(), esp_app_get_description()->version, MODE_NAME, CONFIG_Q31_ITVL_UNITS,
            CONFIG_Q31_ITVL_UNITS * 1.25, CONFIG_Q31_SUPERVISION_TIMEOUT, CONFIG_Q31_CE_LEN,
-           PEER_UPDATE, clear_bonds);
+           PEER_UPDATE, PKT_LOG, clear_bonds);
 
+#if CONFIG_Q31_PKT_LOG
+    pkt_log_start();
+#endif
     ble_central_start(clear_bonds);
 
     // NimBLE and the controller run on core 0; keep screen drawing and log
