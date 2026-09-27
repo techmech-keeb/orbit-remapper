@@ -30,8 +30,9 @@ void ble_central_take_stats(int i, q31_dev_stats_t *out);
 bool ble_central_scanning(void);
 bool ble_central_connecting(void);
 
-// Restarts scanning if a slot is free and nothing is scanning or connecting.
-// Call periodically; scanning can otherwise stay off after a failed start.
+// Call about once a second. Restarts scanning if a slot is free and nothing
+// is scanning or connecting (it can otherwise stay off after a failed
+// start), and subscribes devices that are still unencrypted after 5 s.
 void ble_central_poll(void);
 
 // Short description of the latest connection event, for the screen.

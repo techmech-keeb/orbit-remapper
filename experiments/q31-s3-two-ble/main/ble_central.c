@@ -21,6 +21,7 @@
 #define MAX_HID_SVCS 2
 #define MAX_CHRS     32
 #define CONNECT_TIMEOUT_MS 10000
+#define ENC_WAIT_US (5 * 1000000)
 
 #if CONFIG_Q31_ACCEPT_PEER_UPDATE
 #define ACCEPT_PEER_UPDATE 1
@@ -47,6 +48,11 @@ typedef struct {
     ble_addr_t addr;
     bool encrypted;
     bool repaired; // already retried pairing after the device lost our bond
+    int64_t connected_us;
+
+    bool discovering;
+    bool discovery_finished;
+    bool rediscover; // encryption came up while discovering unencrypted
 
     // GATT discovery
     uint16_t svc_start[MAX_HID_SVCS];
@@ -76,7 +82,7 @@ static bool clear_bonds_on_sync;
 static bool connecting;
 static volatile bool scanning;
 static int last_scan_rc;
-static struct ble_npl_event scan_check_ev;
+static struct ble_npl_event periodic_ev;
 static char last_event[24] = "START";
 
 static int gap_event(struct ble_gap_event *event, void *arg);
@@ -163,14 +169,26 @@ static void start_scan(void)
         scanning = true;
         printf("Q31 EVT t=%.3f scan start\n", esp_timer_get_time() / 1e6);
     } else if (rc != last_scan_rc) {
-        // Retried every second by scan_check(), so only report changes.
+        // Retried every second by periodic_check(), so only report changes.
         printf("Q31 EVT t=%.3f scan start failed rc=0x%x hci=0x%02x\n", esp_timer_get_time() / 1e6, rc, hci(rc));
     }
     last_scan_rc = rc;
 }
 
-static void scan_check(struct ble_npl_event *ev)
+static void start_discovery(dev_t *d);
+
+static void periodic_check(struct ble_npl_event *ev)
 {
+    // Some devices never finish encryption; subscribe anyway so the log
+    // shows whether they need it (the CCCD write then fails).
+    int64_t now = esp_timer_get_time();
+    for (int i = 0; i < Q31_MAX_DEVS; i++) {
+        dev_t *d = &devs[i];
+        if (d->connected && !d->encrypted && !d->discovering && now - d->connected_us > ENC_WAIT_US) {
+            EVT(d, "no encryption after %d s, discovering anyway", ENC_WAIT_US / 1000000);
+            start_discovery(d);
+        }
+    }
     start_scan();
 }
 
@@ -266,9 +284,27 @@ static dev_t *connecting_slot(void)
 
 // ---- GATT: find every Report characteristic and write 0x0001 to its CCCD ----
 
+static void restart_discovery_if_unsubscribed(dev_t *d)
+{
+    if (d->subscribed > 0) {
+        return;
+    }
+    EVT(d, "encrypted now, subscribing again");
+    d->discovering = false;
+    d->discovery_finished = false;
+    d->rediscover = false;
+    d->n_svcs = 0;
+    d->n_chrs = 0;
+    start_discovery(d);
+}
+
 static void discovery_done(dev_t *d)
 {
+    d->discovery_finished = true;
     EVT(d, "subscribed %d report(s)", d->subscribed);
+    if (d->rediscover) {
+        restart_discovery_if_unsubscribed(d);
+    }
 }
 
 static int on_cccd_written(uint16_t conn_handle, const struct ble_gatt_error *error,
@@ -409,6 +445,10 @@ static int on_svc(uint16_t conn_handle, const struct ble_gatt_error *error, cons
 
 static void start_discovery(dev_t *d)
 {
+    if (d->discovering) {
+        return;
+    }
+    d->discovering = true;
     int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_HID_SERVICE), on_svc, d);
     if (rc != 0) {
         EVT(d, "service discovery start failed rc=0x%x", rc);
@@ -476,6 +516,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         portENTER_CRITICAL(&stats_mux);
         d->connected = true;
         d->conn_handle = event->connect.conn_handle;
+        d->connected_us = esp_timer_get_time();
         portEXIT_CRITICAL(&stats_mux);
         print_params(d, "connected");
         set_last_event("CONN", (int)(d - devs), -1);
@@ -558,6 +599,14 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             EVT(d, "requested update to %.2fms rc=0x%x", ms(CONFIG_Q31_ITVL_UNITS), urc);
         }
 #endif
+        if (d->encrypted && d->discovering) {
+            // Subscribing before encryption may have failed; retry once it is up.
+            if (d->discovery_finished) {
+                restart_discovery_if_unsubscribed(d);
+            } else {
+                d->rediscover = true;
+            }
+        }
         start_discovery(d);
         return 0;
 
@@ -635,14 +684,14 @@ void ble_central_start(bool clear_bonds)
     ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
 
     ble_store_config_init();
-    ble_npl_event_init(&scan_check_ev, scan_check, NULL);
+    ble_npl_event_init(&periodic_ev, periodic_check, NULL);
     nimble_port_freertos_init(host_task);
 }
 
 void ble_central_poll(void)
 {
     // start_scan() touches host state, so run it on the NimBLE host task.
-    ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &scan_check_ev);
+    ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &periodic_ev);
 }
 
 bool ble_central_connecting(void)
