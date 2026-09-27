@@ -808,8 +808,15 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             return 0;
         }
         if (event->enc_change.status == BLE_HS_HCI_ERR(BLE_ERR_PINKEY_MISSING) && !d->repaired) {
-            // The device forgot our bond (e.g. it was re-paired elsewhere): drop ours and pair again.
-            EVT(d, "device lost the bond, pairing again");
+            // The device says it has no key for us (it was re-paired elsewhere
+            // or reset). Replacing our bond is a new pairing, so only in
+            // pairing mode; otherwise anything claiming a bonded address
+            // could pair itself in.
+            if (peers_only) {
+                give_up_on(d, "device lost the bond; press Pair new device to pair it again", 0);
+                return 0;
+            }
+            EVT(d, "device lost the bond, pairing again (pairing mode)");
             d->repaired = true;
             ble_store_util_delete_peer(&d->addr);
             ble_gap_security_initiate(d->conn_handle);
@@ -839,7 +846,15 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         return 0;
 
     case BLE_GAP_EVENT_REPEAT_PAIRING: {
-        // We still hold a bond the device no longer has: replace it.
+        // The device wants to pair although we hold a bond for it. Replacing
+        // the bond is only allowed in pairing mode (see PINKEY_MISSING above).
+        d = dev_by_handle(event->repeat_pairing.conn_handle);
+        if (peers_only) {
+            if (d != NULL) {
+                give_up_on(d, "device asked to pair again; press Pair new device to allow it", 0);
+            }
+            return BLE_GAP_REPEAT_PAIRING_IGNORE;
+        }
         struct ble_gap_conn_desc desc;
         if (ble_gap_conn_find(event->repeat_pairing.conn_handle, &desc) == 0) {
             ble_store_util_delete_peer(&desc.peer_id_addr);
