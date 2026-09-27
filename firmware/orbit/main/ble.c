@@ -256,10 +256,14 @@ static void start_scan(void) {
         return;
     }
     // Active scan: some devices only put the HID UUID in the scan response.
+    // No duplicate filtering: the controller would report each address once
+    // per scan, so a device skipped while it was being avoided (or while it
+    // was busy) would never be seen again until the scan restarted (0a0cfcf
+    // report: a bonded keyboard stayed invisible for an hour).
     const struct ble_gap_disc_params params = {
         .itvl = 0x60,   // 60 ms
         .window = 0x30, // 30 ms
-        .filter_duplicates = 1,
+        .filter_duplicates = 0,
     };
     int rc = ble_gap_disc(own_addr_type, BLE_HS_FOREVER, &params, gap_event, NULL);
     if (rc == 0) {
