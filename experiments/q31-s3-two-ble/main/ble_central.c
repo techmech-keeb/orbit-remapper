@@ -12,6 +12,10 @@
 #include "host/util/util.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
+#if CONFIG_BT_NIMBLE_GATT_SERVER
+#include "services/gap/ble_svc_gap.h"
+#include "services/gatt/ble_svc_gatt.h"
+#endif
 #include "ble_central.h"
 
 #define UUID_HID_SERVICE 0x1812
@@ -710,6 +714,13 @@ void ble_central_start(bool clear_bonds)
     ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
     ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
 
+#if CONFIG_BT_NIMBLE_GATT_SERVER
+    // Answers the device's own GATT requests (device name, service list, MTU).
+    // Without a GATT server NimBLE drops them unanswered (ble_att.c).
+    ble_svc_gap_init();
+    ble_svc_gatt_init();
+    ble_svc_gap_device_name_set("q31-s3-two-ble");
+#endif
     ble_store_config_init();
     ble_npl_event_init(&periodic_ev, periodic_check, NULL);
     nimble_port_freertos_init(host_task);

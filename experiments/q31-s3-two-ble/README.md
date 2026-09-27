@@ -2,7 +2,7 @@
 
 初代 M5Dial（ESP32-S3）が、BLE のキーボードとマウスの 2 台を、どちらも接続間隔 7.5 ms で受けられるかを測るための試験プログラム。仕様は [q31-experiment-brief.md](../../docs/drafts/2026-09-26/q31-experiment-brief.md) による。
 
-**測定は途中。** ビルドは下記の設定すべてで警告なしに通る（ESP-IDF v5.5.5）。実機（初代 M5Dial）では 2 台と 7.5 ms でつながり、報告が届くところまで確かめた。ただし Mistel MD600 Alpha が約 30 秒ごとに切れる問題を調べている（`PKT` 行で、機器とのやり取りを見る）。
+**測定は途中。** ビルドは下記の設定すべてで警告なしに通る（ESP-IDF v5.5.5）。実機（初代 M5Dial）では 2 台と 7.5 ms でつながり、報告が届くところまで確かめた。ただし Mistel MD600 Alpha が約 30 秒ごとに切れる問題を調べている（下の「30 秒ごとの切断を調べる版」）。
 
 やること：HID 機器（サービス 0x1812）を探して最大 2 台につなぎ、暗号化して、入力の報告（0x2A4D）の通知を受け、届いた回数と間隔を 1 秒ごとに出す。報告の中身は読まない。リマップや PC への USB 出力はしない。Wi-Fi は初期化しない。
 
@@ -34,6 +34,19 @@ idf.py -B build-after -DSDKCONFIG=build-after/sdkconfig \
   -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.after_connect" build
 idf.py -B build-after -p <ポート> flash monitor
 ```
+
+### 30 秒ごとの切断を調べる版（GATT サーバー入り）
+
+見立て：このプログラムは機器を受ける側（central）の役だけでビルドしていて、NimBLE の GATT サーバーが入っていない。この状態の NimBLE は、機器から届いた ATT の要求（MTU の交換、機器名やサービス一覧の読み出しなど）を、エラー応答も返さずに捨てる（ESP-IDF v5.5.5 の `ble_att.c`、`ble_att_rx_extended()` と `ble_att_rx_handle_unknown_request()` で確認）。規格では、要求を出した側は応答を 30 秒待ち、来なければ接続を切る。MD600 が実際に要求を出しているかは**未確認**で、下の `PKT` 行で確かめる。
+
+GATT サーバーを入れ、標準の GAP・GATT サービス（機器名など）を登録した版は、次のようにビルドする。広告（advertising）はしないので、ほかの機器からつながれることはない。
+
+```sh
+idf.py -B build-gatts -DSDKCONFIG=build-gatts/sdkconfig \
+  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.gatt_server" build
+```
+
+どちらの版かは、`START` 行の `gatts=0`（GATT サーバーなし）／`gatts=1`（あり）で見分ける。
 
 ### そのほかの設定
 
@@ -72,7 +85,7 @@ idf.py -B build-after -p <ポート> flash monitor
 ログはすべて `Q31` で始まる。`grep '^Q31'` で抜き出せる。時刻 `t` は起動からの秒数。
 
 ```text
-Q31 START idf=v5.5.5 app=<コミット> mode=at-connect itvl_req=6(7.50ms) to=400 ce_len=0 peer_update=keep-itvl pkt_log=1 clear_bonds=0
+Q31 START idf=v5.5.5 app=<コミット> mode=at-connect itvl_req=6(7.50ms) to=400 ce_len=0 peer_update=keep-itvl gatts=0 pkt_log=1 clear_bonds=0
 Q31 SUM t=12 conn=2/2 scan=0 connecting=0
 Q31 DEV t=12 D0 addr=..:3a:5f h=1 itvl=6(7.50ms) lat=0 to=400 enc=1 subs=3 rpt=120 maxgap=9.1ms gaps<=8/16/32/>32=100/18/1/0 total=1440 disc=0
 Q31 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
@@ -142,7 +155,7 @@ Q31 PKT t=4.600 h=1 NO ANSWER from us to the device's MTU_REQ for 1.0s
 ## 未確認のこと・制約
 
 - 実機で確かめたこと（2026-09-27、初代 M5Dial）：Mistel MD600 Alpha と meteorite40 の 2 台と 7.5 ms でつながり、報告が届く。MD600 は約 30 秒ごとに相手から切られる（`hci=0x13`）。原因は調査中。
-- `PKT` 行の仕組みは、ビルドと PC 上での読み取りの試験だけで、実機では未確認。
+- `PKT` 行の仕組みと GATT サーバー入りの版は、ビルドと PC 上での読み取りの試験だけで、実機では未確認。
 - 数字入力が必要なペアリング（キーボードで 6 桁を打つ方式）には対応していない。こちらは「入出力なし」として名乗るので、通常は確認なしのペアリングになる見込み。
 - 機器がアドレスを定期的に変える方式（プライバシー機能）を使っている場合、HID の識別子を出さずに接続を求められると、見つけられないことがある。
 - ペアリング情報は最大 3 台分保存する（ESP-IDF の既定）。
