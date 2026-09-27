@@ -81,6 +81,9 @@ void display_init(void)
     ESP_ERROR_CHECK(esp_lcd_new_panel_gc9a01(io, &panel_cfg, &panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+    // Display Function Control with the source scan reversed, as M5GFX's
+    // Panel_GC9A01 sends it. Without it the M5Dial shows text mirrored.
+    ESP_ERROR_CHECK(esp_lcd_panel_io_tx_param(io, 0xB6, (uint8_t[]){0x00, 0x20}, 2));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
 
