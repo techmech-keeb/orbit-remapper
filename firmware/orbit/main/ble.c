@@ -50,6 +50,12 @@
 
 #define REPORT_QUEUE_LEN 32
 
+// A device whose encryption failed (it still holds keys from an earlier
+// pairing) reconnects at once and fails again: 280 attempts in 2 minutes,
+// crowding out other devices (09b3075 report). Leave it alone for a while.
+#define AVOID_US (30 * 1000000)
+#define AVOID_MAX 4
+
 // Provided by NimBLE's NVS-backed store; it has no public header.
 void ble_store_config_init(void);
 
@@ -117,6 +123,45 @@ static char last_event[24] = "START";
 static TaskHandle_t wake_task;
 static QueueHandle_t report_q, report_map_q, disconnect_q;
 static uint32_t reports_lost;
+
+static struct {
+    ble_addr_t addr;
+    int64_t until_us;
+} avoid[AVOID_MAX];
+
+static void avoid_add(const ble_addr_t* addr) {
+    int64_t now = esp_timer_get_time();
+    int slot = 0;
+    for (int i = 0; i < AVOID_MAX; i++) {
+        if (ble_addr_cmp(&avoid[i].addr, addr) == 0 || avoid[i].until_us <= now) {
+            slot = i;
+            break;
+        }
+        if (avoid[i].until_us < avoid[slot].until_us) {
+            slot = i; // oldest entry, if all are live
+        }
+    }
+    avoid[slot].addr = *addr;
+    avoid[slot].until_us = now + AVOID_US;
+}
+
+static bool avoided(const ble_addr_t* addr) {
+    int64_t now = esp_timer_get_time();
+    for (int i = 0; i < AVOID_MAX; i++) {
+        if (avoid[i].until_us > now && ble_addr_cmp(&avoid[i].addr, addr) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Drops the link and leaves the device alone for AVOID_US.
+static void give_up_on(dev_t* d, const char* why, int status) {
+    EVT(d, "%s, dropping the link and ignoring the device for %d s", why, AVOID_US / 1000000);
+    set_last_event("ENCFAIL", (int) (d - devs), status);
+    avoid_add(&d->addr);
+    ble_gap_terminate(d->conn_handle, BLE_ERR_AUTH_FAIL);
+}
 
 static int gap_event(struct ble_gap_event* event, void* arg);
 static void discover_next_report(dev_t* d);
@@ -282,6 +327,9 @@ static bool is_bonded(const ble_addr_t* addr) {
 // (prior-art.md, esp32-hid-gamepad-bridge §4.20), so bonded addresses and
 // directed advertising count as well.
 static bool is_candidate(const struct ble_gap_disc_desc* disc) {
+    if (avoided(&disc->addr)) {
+        return false;
+    }
     if (disc->event_type == BLE_HCI_ADV_RPT_EVTYPE_DIR_IND || is_bonded(&disc->addr)) {
         return true;
     }
@@ -684,8 +732,11 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         // (prior-art.md §4.29), so start it ourselves.
         int rc = ble_gap_security_initiate(d->conn_handle);
         if (rc != 0) {
-            EVT(d, "security start failed rc=0x%x, discovering anyway", rc);
-            start_discovery(d);
+            // Seen as rc=0x6 while a previous link to the same device was
+            // still being torn down (09b3075 report); unencrypted the link
+            // would only occupy the slot.
+            give_up_on(d, "security start failed", rc);
+            return 0;
         }
         start_scan();
         return 0;
@@ -770,8 +821,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // Usually the device still holds keys from an earlier pairing that
             // we no longer have. Keeping the link would only block a slot
             // (6254d16 report); drop it, and the device can pair afresh.
-            set_last_event("ENCFAIL", (int) (d - devs), hci(event->enc_change.status));
-            ble_gap_terminate(d->conn_handle, BLE_ERR_AUTH_FAIL);
+            give_up_on(d, "encryption failed", hci(event->enc_change.status));
             return 0;
         }
         {
