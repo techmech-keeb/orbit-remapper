@@ -105,6 +105,13 @@ static void status_task(void* arg) {
         set_line(&lines[4], mounted && !susp ? GREEN : YELLOW, "USB %s",
                  !mounted ? "--" : susp ? "SUSPEND" : "OK");
         set_line(&lines[5], WHITE, "%s", boot_protocol_keyboard ? "BOOT KBD" : " ");
+        orbit_log_stats_t ls;
+        orbit_log_get_stats(&ls);
+        set_line(&lines[6], ls.connected ? GREEN : GREY, "LOG %s %luK", ls.connected ? "DTR" : "--",
+                 (unsigned long) (ls.sent / 1024));
+        if (ls.lost != 0) {
+            set_line(&lines[9], YELLOW, "LOG LOST %luK", (unsigned long) (ls.lost / 1024));
+        }
         set_line(&lines[7], GREY, "HEAP %uK MIN %uK", (unsigned) (esp_get_free_heap_size() / 1024),
                  (unsigned) (esp_get_minimum_free_heap_size() / 1024));
         display_show(lines);
@@ -133,6 +140,7 @@ static void main_loop(void* arg) {
         ulTaskNotifyTake(pdTRUE, 1);
 
         tud_task_ext(0, false);
+        orbit_log_pump();
 
         if (their_descriptor_updated) {
             update_their_descriptor_derivates();
@@ -178,6 +186,7 @@ static void main_loop(void* arg) {
             int64_t until = esp_timer_get_time() + 300000;
             while (esp_timer_get_time() < until) {
                 tud_task_ext(0, false);
+                orbit_log_pump();
                 vTaskDelay(1);
             }
             tud_disconnect();
