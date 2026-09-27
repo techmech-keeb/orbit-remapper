@@ -33,6 +33,13 @@
 #define MAX_HID_SVCS 2
 #define MAX_CHRS     32
 #define CONNECT_TIMEOUT_MS 10000
+// NimBLE cancels a connect attempt after CONNECT_TIMEOUT_MS and then waits
+// for the controller's "connection complete" event, which may never come
+// (ble_gap.c, ble_gap_master_timer: "XXX: Set a timer to reset the
+// controller..."). Seen twice when a device vanished right after
+// advertising (09b3075 report): the attempt hung until RST.
+#define CONNECT_STUCK_CANCEL_US (15 * 1000000)
+#define CONNECT_STUCK_RESET_US  (25 * 1000000)
 #define ENC_WAIT_US (5 * 1000000)
 
 // Connection parameters requested in the connection request (q31-results.md
@@ -101,6 +108,7 @@ static dev_t devs[ORBIT_MAX_DEVS];
 static portMUX_TYPE stats_mux = portMUX_INITIALIZER_UNLOCKED;
 static uint8_t own_addr_type;
 static bool connecting;
+static int64_t connecting_since_us;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
@@ -219,9 +227,22 @@ static void start_scan(void) {
 }
 
 static void periodic_check(struct ble_npl_event* ev) {
+    int64_t now = esp_timer_get_time();
+
+    if (connecting && now - connecting_since_us > CONNECT_STUCK_RESET_US) {
+        olog("M1 EVT t=%.3f connect attempt stuck for %d s, resetting the BLE host\n", now_s(),
+             (int) ((now - connecting_since_us) / 1000000));
+        ble_hs_sched_reset(BLE_HS_ETIMEOUT);
+        return;
+    }
+    if (connecting && now - connecting_since_us > CONNECT_STUCK_CANCEL_US) {
+        int rc = ble_gap_conn_cancel();
+        olog("M1 EVT t=%.3f connect attempt stuck for %d s, cancel rc=0x%x\n", now_s(),
+             (int) ((now - connecting_since_us) / 1000000), rc);
+    }
+
     // Some devices never finish encryption; subscribe anyway so the log
     // shows whether they need it (the CCCD write then fails).
-    int64_t now = esp_timer_get_time();
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
         if (d->connected && !d->encrypted && !d->discovering && now - d->connected_us > ENC_WAIT_US) {
@@ -315,6 +336,7 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     }
     d->in_use = true;
     connecting = true;
+    connecting_since_us = esp_timer_get_time();
     EVT(d, "connecting rssi=%d adv_type=%u", disc->rssi, disc->event_type);
 }
 
@@ -806,6 +828,21 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
 // ---- host lifecycle ----
 
 static void on_sync(void) {
+    // Also reached after a host reset: every link is gone, tell the core.
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        if (devs[i].connected) {
+            orbit_disconnect_t item = { .slot = (uint8_t) i };
+            xQueueSend(disconnect_q, &item, 0);
+        }
+        portENTER_CRITICAL(&stats_mux);
+        devs[i].connected = false;
+        devs[i].in_use = false;
+        portEXIT_CRITICAL(&stats_mux);
+    }
+    wake();
+    connecting = false;
+    scanning = false;
+
     int rc = ble_hs_util_ensure_addr(0);
     assert(rc == 0);
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
