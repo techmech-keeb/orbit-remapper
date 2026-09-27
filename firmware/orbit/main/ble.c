@@ -116,6 +116,7 @@ static portMUX_TYPE stats_mux = portMUX_INITIALIZER_UNLOCKED;
 static uint8_t own_addr_type;
 static bool connecting;
 static int64_t connecting_since_us;
+static bool connecting_cancel_logged;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
@@ -286,10 +287,11 @@ static void periodic_check(struct ble_npl_event* ev) {
         ble_hs_sched_reset(BLE_HS_ETIMEOUT);
         return;
     }
-    if (connecting && now - connecting_since_us > CONNECT_STUCK_CANCEL_US) {
+    if (connecting && now - connecting_since_us > CONNECT_STUCK_CANCEL_US && !connecting_cancel_logged) {
         int rc = ble_gap_conn_cancel();
         olog("M1 EVT t=%.3f connect attempt stuck for %d s, cancel rc=0x%x\n", now_s(),
              (int) ((now - connecting_since_us) / 1000000), rc);
+        connecting_cancel_logged = true;
     }
 
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
@@ -403,6 +405,7 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     d->in_use = true;
     connecting = true;
     connecting_since_us = esp_timer_get_time();
+    connecting_cancel_logged = false;
     EVT(d, "connecting rssi=%d adv_type=%u", disc->rssi, disc->event_type);
 }
 
@@ -551,7 +554,8 @@ static int on_report_map(uint16_t conn_handle, const struct ble_gatt_error* erro
         return 0; // NimBLE keeps reading until the value ends
     }
     if (error->status != BLE_HS_EDONE) {
-        EVT(d, "report map read failed status=0x%x", error->status);
+        EVT(d, "report map read failed status=0x%x, %u byte(s) discarded", error->status, m->len);
+        m->len = 0; // a partial descriptor must not reach the core
     }
     m->interface = (uint16_t) ((d - devs) << 8);
     m->hub_port = bond_index(&d->addr);
