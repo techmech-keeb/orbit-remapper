@@ -125,6 +125,7 @@ struct dev {
     uint32_t gaps[GAP_BUCKETS];
     uint32_t total_reports;
     uint32_t disconnects;
+    uint8_t stalls; // discovery stalls in a row on this slot's device (kept across reconnects)
 };
 
 // Stale procedures die within the 30 s ATT timeout, so a small ring suffices.
@@ -365,9 +366,19 @@ static void periodic_check(struct ble_npl_event* ev) {
         dev_t* d = &devs[i];
         if (d->connected && d->discovering && !d->discovery_finished &&
             now - d->discovery_progress_us > DISCOVERY_STALL_US) {
-            EVT(d, "discovery stalled for %d s, dropping the link to retry", DISCOVERY_STALL_US / 1000000);
-            d->discovery_finished = true; // so this fires once
-            ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            d->discovery_finished = true; // so this fires once per link
+            d->stalls++;
+            if (d->stalls == 1) {
+                EVT(d, "discovery stalled for %d s, dropping the link to retry", DISCOVERY_STALL_US / 1000000);
+                ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            } else {
+                // Reconnecting every 5 s never got an answer out of a
+                // reset MD600 (f102c45 report: 10 rounds in a minute),
+                // while a link left alone recovered after the 30 s ATT
+                // timeout (a195bc8). Second stall in a row: keep the
+                // link and let the ATT timeout end the discovery.
+                EVT(d, "discovery stalled again (%u in a row), keeping the link until the ATT timeout", d->stalls);
+            }
         }
     }
 
@@ -448,10 +459,14 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     scanning = false;
 
     uint32_t gen = d->gen + 1;
+    bool same_device = ble_addr_cmp(&d->addr, &disc->addr) == 0;
     portENTER_CRITICAL(&stats_mux);
     memset(d, 0, offsetof(dev_t, total_reports)); // keep the slot's running totals
     d->gen = gen;
     d->addr = disc->addr;
+    if (!same_device) {
+        d->stalls = 0;
+    }
     portEXIT_CRITICAL(&stats_mux);
     d->ctx = new_gatt_ctx(d);
 
@@ -504,6 +519,9 @@ static void restart_discovery_if_unsubscribed(dev_t* d) {
 
 static void discovery_done(dev_t* d) {
     d->discovery_finished = true;
+    if (d->subscribed > 0) {
+        d->stalls = 0;
+    }
     EVT(d, "subscribed %d input report(s)", d->subscribed);
     if (d->rediscover) {
         restart_discovery_if_unsubscribed(d);
