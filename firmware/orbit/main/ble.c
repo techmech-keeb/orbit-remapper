@@ -57,7 +57,10 @@
 
 // A device whose encryption failed (it still holds keys from an earlier
 // pairing) reconnects at once and fails again: 280 attempts in 2 minutes,
-// crowding out other devices (09b3075 report). Leave it alone for a while.
+// crowding out other devices (09b3075 report). After MAX_FAILS failures in
+// a row it is left out of the accept list for AVOID_US (nRF Desktop allows
+// two attempts per device before filtering it).
+#define MAX_FAILS 2
 #define AVOID_US (30 * 1000000)
 #define AVOID_MAX 4
 
@@ -172,35 +175,59 @@ static uint32_t reports_lost;
 
 static struct {
     ble_addr_t addr;
-    int64_t until_us;
-} avoid[AVOID_MAX];
+    uint8_t fails;    // failures in a row
+    int64_t until_us; // excluded until then (0: not excluded)
+} trouble[AVOID_MAX];
 
-static void avoid_add(const ble_addr_t* addr) {
+static int trouble_slot(const ble_addr_t* addr) {
     int64_t now = esp_timer_get_time();
     int slot = 0;
     for (int i = 0; i < AVOID_MAX; i++) {
-        if (ble_addr_cmp(&avoid[i].addr, addr) == 0 || avoid[i].until_us <= now) {
-            slot = i;
-            break;
+        if (ble_addr_cmp(&trouble[i].addr, addr) == 0) {
+            return i;
         }
-        if (avoid[i].until_us < avoid[slot].until_us) {
-            slot = i; // oldest entry, if all are live
+        // Otherwise reuse a free or expired entry, else the oldest.
+        if (trouble[i].fails == 0 && trouble[i].until_us <= now) {
+            slot = i;
+        } else if (trouble[i].until_us < trouble[slot].until_us) {
+            slot = i;
         }
     }
-    avoid[slot].addr = *addr;
-    avoid[slot].until_us = now + AVOID_US;
+    trouble[slot].addr = *addr;
+    trouble[slot].fails = 0;
+    trouble[slot].until_us = 0;
+    return slot;
+}
+
+// Returns true when the device has just been excluded.
+static bool fail_note(const ble_addr_t* addr) {
+    int i = trouble_slot(addr);
+    if (++trouble[i].fails < MAX_FAILS) {
+        return false;
+    }
+    trouble[i].fails = 0;
+    trouble[i].until_us = esp_timer_get_time() + AVOID_US;
+    return true;
+}
+
+static void fail_clear(const ble_addr_t* addr) {
+    for (int i = 0; i < AVOID_MAX; i++) {
+        if (ble_addr_cmp(&trouble[i].addr, addr) == 0) {
+            trouble[i].fails = 0;
+            trouble[i].until_us = 0;
+        }
+    }
 }
 
 static bool avoided(const ble_addr_t* addr) {
     int64_t now = esp_timer_get_time();
     for (int i = 0; i < AVOID_MAX; i++) {
-        if (avoid[i].until_us > now && ble_addr_cmp(&avoid[i].addr, addr) == 0) {
+        if (trouble[i].until_us > now && ble_addr_cmp(&trouble[i].addr, addr) == 0) {
             return true;
         }
     }
     return false;
 }
-
 
 static int gap_event(struct ble_gap_event* event, void* arg);
 static void discover_next_report(dev_t* d);
@@ -234,11 +261,12 @@ static void set_last_event(const char* what, int slot, int status) {
     olog("M1 EVT t=%.3f D%d addr=..:%02x:%02x " fmt "\n", now_s(), (int) ((d) - devs), (d)->addr.val[1], \
          (d)->addr.val[0], ##__VA_ARGS__)
 
-// Drops the link and leaves the device alone for AVOID_US.
+// Drops the link; the device is excluded for AVOID_US once this has
+// happened MAX_FAILS times in a row.
 static void give_up_on(dev_t* d, const char* why, int status) {
-    EVT(d, "%s, dropping the link and ignoring the device for %d s", why, AVOID_US / 1000000);
+    bool excluded = fail_note(&d->addr);
+    EVT(d, "%s, dropping the link%s", why, excluded ? ", ignoring the device for 30 s" : "");
     set_last_event("ENCFAIL", (int) (d - devs), status);
-    avoid_add(&d->addr);
     ble_gap_terminate(d->conn_handle, BLE_ERR_AUTH_FAIL);
 }
 
@@ -602,6 +630,7 @@ static void discovery_done(dev_t* d) {
     d->discovery_finished = true;
     if (d->subscribed > 0) {
         d->stalls = 0;
+        fail_clear(&d->addr);
     }
     EVT(d, "subscribed %d input report(s)", d->subscribed);
     if (d->rediscover) {
@@ -1015,8 +1044,10 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
                 // NimBLE has already left the connect procedure, so the
                 // wait is over; start the next round.
                 wl_waiting = false;
-                olog("M1 EVT t=%.3f addr=..:%02x:%02x connect failed before the connect event reason=0x%x hci=0x%02x\n",
-                     now_s(), peer->val[1], peer->val[0], event->disconnect.reason, hci(event->disconnect.reason));
+                bool excluded = fail_note(peer);
+                olog("M1 EVT t=%.3f addr=..:%02x:%02x connect failed before the connect event reason=0x%x hci=0x%02x%s\n",
+                     now_s(), peer->val[1], peer->val[0], event->disconnect.reason, hci(event->disconnect.reason),
+                     excluded ? ", ignoring the device for 30 s" : "");
                 schedule();
                 return 0;
             }
@@ -1026,8 +1057,11 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
                      event->disconnect.conn.conn_handle, event->disconnect.reason);
                 return 0;
             }
-            EVT(d, "connect failed before the connect event reason=0x%x hci=0x%02x", event->disconnect.reason,
-                hci(event->disconnect.reason));
+            {
+                bool excluded = fail_note(&d->addr);
+                EVT(d, "connect failed before the connect event reason=0x%x hci=0x%02x%s", event->disconnect.reason,
+                    hci(event->disconnect.reason), excluded ? ", ignoring the device for 30 s" : "");
+            }
             set_last_event("CONNFAIL", (int) (d - devs), hci(event->disconnect.reason));
             connecting = false;
             portENTER_CRITICAL(&stats_mux);
