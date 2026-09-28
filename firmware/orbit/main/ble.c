@@ -269,6 +269,23 @@ static dev_t* free_slot(void) {
     return NULL;
 }
 
+// "public", "static", "rpa" (resolvable private, changes over time) or
+// "nrpa". Bonded reconnection through the controller's accept list needs a
+// public or static address, so the kind is logged for each bond and link
+// (ble-connect-plan.md, stage 1).
+static const char* addr_kind(const ble_addr_t* a) {
+    switch (a->type) {
+    case BLE_ADDR_PUBLIC:
+    case BLE_ADDR_PUBLIC_ID:
+        return "public";
+    case BLE_ADDR_RANDOM:
+    case BLE_ADDR_RANDOM_ID:
+        return BLE_ADDR_IS_RPA(a) ? "rpa" : BLE_ADDR_IS_NRPA(a) ? "nrpa" : "static";
+    default:
+        return "?";
+    }
+}
+
 static void print_params(dev_t* d, const char* what) {
     struct ble_gap_conn_desc desc;
     if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
@@ -458,7 +475,7 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     connecting = true;
     connecting_since_us = esp_timer_get_time();
     connecting_cancel_logged = false;
-    EVT(d, "connecting rssi=%d adv_type=%u", disc->rssi, disc->event_type);
+    EVT(d, "connecting rssi=%d adv_type=%u addr_kind=%s", disc->rssi, disc->event_type, addr_kind(&disc->addr));
 }
 
 static dev_t* connecting_slot(void) {
@@ -811,6 +828,13 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         d->connected_us = esp_timer_get_time();
         portEXIT_CRITICAL(&stats_mux);
         print_params(d, "connected");
+        {
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
+                EVT(d, "peer id=%s ..:%02x:%02x ota=%s", addr_kind(&desc.peer_id_addr), desc.peer_id_addr.val[1],
+                    desc.peer_id_addr.val[0], addr_kind(&desc.peer_ota_addr));
+            }
+        }
         set_last_event("CONN", (int) (d - devs), -1);
         // HOGP devices may not send reports until the link is encrypted
         // (prior-art.md §4.29), so start it ourselves.
@@ -1003,6 +1027,10 @@ static void on_sync(void) {
     ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
     peers_only = n > 0; // nothing bonded yet: accept any HID device, as upstream
     olog("M1 EVT t=%.3f ble ready bonds=%d\n", now_s(), n);
+    for (int i = 0; i < n; i++) {
+        olog("M1 EVT t=%.3f bond %d addr=..:%02x:%02x kind=%s\n", now_s(), i + 1, peers[i].val[1], peers[i].val[0],
+             addr_kind(&peers[i]));
+    }
     start_scan();
 }
 
