@@ -78,6 +78,7 @@ void orbit_ble_take_stats(int i, orbit_dev_stats_t* out);
 
 int orbit_ble_connected_count(void);
 bool orbit_ble_scanning(void);
+bool orbit_ble_waiting(void); // the controller is waiting for a bonded device (accept list)
 bool orbit_ble_pairing(void); // accepting devices that are not bonded yet
 
 // Short description of the latest connection event, for the screen.

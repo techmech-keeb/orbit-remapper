@@ -170,8 +170,9 @@ static void status_task(void* arg) {
         // Internal RAM only (A9). The M5Dial has no PSRAM, but say so explicitly.
         unsigned heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         unsigned heap_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
-        olog("M1 SUM t=%.0f conn=%d/%d scan=%d pairing=%d usb=%s boot_protocol=%d heap_free=%u heap_min=%u lost=%lu\n",
-             t, conn, ORBIT_MAX_DEVS, orbit_ble_scanning(), orbit_ble_pairing(),
+        olog("M1 SUM t=%.0f conn=%d/%d scan=%d wait=%d pairing=%d usb=%s boot_protocol=%d heap_free=%u heap_min=%u "
+             "lost=%lu\n",
+             t, conn, ORBIT_MAX_DEVS, orbit_ble_scanning(), orbit_ble_waiting(), orbit_ble_pairing(),
              !mounted ? "none" : susp ? "suspended" : "mounted", boot_protocol_keyboard, heap_free, heap_min,
              (unsigned long) lost);
 
@@ -180,7 +181,8 @@ static void status_task(void* arg) {
         set_line(&lines[1], mounted && !susp ? GREEN : YELLOW, "USB %s %s", !mounted ? "--" : susp ? "SUSP" : "OK",
                  boot_protocol_keyboard ? "BOOT" : "");
         set_line(&lines[2], orbit_ble_pairing() ? YELLOW : WHITE, "%s %d/%d",
-                 orbit_ble_pairing() ? "PAIRING" : orbit_ble_scanning() ? "SCAN" : "IDLE", conn, ORBIT_MAX_DEVS);
+                 orbit_ble_pairing() ? "PAIRING" : orbit_ble_scanning() ? "SCAN" : orbit_ble_waiting() ? "WAIT" : "IDLE",
+                 conn, ORBIT_MAX_DEVS);
         orbit_dev_stats_t st;
         for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
             orbit_ble_take_stats(i, &st);

@@ -51,7 +51,7 @@ idf.py build merge-bin
 ## 3. 使い方
 
 1. 書き込むと、ペアリング情報が無ければ**ペアリング待ち**で起動する（画面 3 行目 `PAIRING 0/2`、黄色）。近くでペアリング待ちにした HID 機器に自分からつなぐ。**ほかの HID 機器がペアリング待ちだと、そちらにつないでしまう。**
-2. 1 台つながって暗号化できると、**以後はペアリング済みの機器だけ**を探す（`SCAN`）。2 台目を足すには、設定ツールの「Pair new device」を押す（本家と同じ）。
+2. 1 台つながって暗号化できると、**以後はペアリング済みの機器だけ**を待つ（`WAIT`。ペアリング済みのアドレスを無線チップの許可リストに渡し、どれかが現れたら接続する）。2 台目を足すには、設定ツールの「Pair new device」を押す（本家と同じ）。
 3. 切断されると自動でつなぎ直す。電源の入れ直し・スリープからの復帰も同じ。
 4. ペアリング情報を全部消すには、設定ツールの「Clear bonds」。機器側でも Orbit のペアリングを消してから、ペアリングし直す（機器側で消し直すと、機器のアドレスが変わることがある。Q31 で MD600 が該当）。
 
@@ -69,7 +69,7 @@ USB の CDC（Windows では COM ポート、Linux では `/dev/ttyACM*`）に�
 
 ```text
 M1 START idf=v5.5.5 app=<git describe> upstream=51ab8b3 config_size=2048 descriptor=0 vid=cafe pid=baf2 max_devs=2 conn_itvl=6(7.50ms) lvgl_reserve=ok
-M1 SUM t=12 conn=2/2 scan=0 pairing=0 usb=mounted boot_protocol=0 heap_free=150000 heap_min=140000
+M1 SUM t=12 conn=2/2 scan=0 wait=0 pairing=0 usb=mounted boot_protocol=0 heap_free=150000 heap_min=140000
 M1 DEV t=12 D0 addr=..:3a:5f h=1 itvl=6(7.50ms) lat=0 to=400 enc=1 subs=3 rpt=120 maxgap=9.1ms gaps<=8/16/32/>32=100/18/1/0 total=1440 disc=0
 M1 LAT t=12 n=118 avg=1.32ms max=2.10ms <=8/<=16/>16=118/0/0
 M1 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
@@ -101,7 +101,7 @@ M1 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
 
 `EVT` 行の `hci=` は Bluetooth の規格の番号（`0x08` 通信が途絶えた、`0x13` 相手が切った、`0x16` こちらが切った、`0x12` 条件が不正）。
 
-**画面**：1 行目に版、2 行目に USB（`OK`／`SUSP`／`--`、boot protocol なら `BOOT`）、3 行目に `PAIRING`／`SCAN`／`IDLE` と台数、機器ごとに 2 行（アドレスの下位と実際の間隔：緑＝7.5 ms、黄＝違う／latency、暗号化、登録数、直近 1 秒の報告数）、`LAT`（緑＝最大 3 ms 以内）、ログの状態（`LOG DTR 3K C12`：DTR あり、3 KB 渡し、PC が 12 回受け取った）、空きメモリ、最後のイベント。
+**画面**：1 行目に版、2 行目に USB（`OK`／`SUSP`／`--`、boot protocol なら `BOOT`）、3 行目に `PAIRING`／`SCAN`／`WAIT`／`IDLE` と台数、機器ごとに 2 行（アドレスの下位と実際の間隔：緑＝7.5 ms、黄＝違う／latency、暗号化、登録数、直近 1 秒の報告数）、`LAT`（緑＝最大 3 ms 以内）、ログの状態（`LOG DTR 3K C12`：DTR あり、3 KB 渡し、PC が 12 回受け取った）、空きメモリ、最後のイベント。
 
 ## 6. 遅れ（`LAT`）の測り方
 

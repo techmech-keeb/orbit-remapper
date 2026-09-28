@@ -32,7 +32,8 @@
 
 #define MAX_HID_SVCS 2
 #define MAX_CHRS     32
-#define CONNECT_TIMEOUT_MS 10000
+#define CONNECT_TIMEOUT_MS 10000 // one direct connect, or one round of accept-list waiting
+#define RECONNECT_HOLD_MS 500     // pause after a disconnect before the next attempt (RMK, upstream BLE)
 // NimBLE cancels a connect attempt after CONNECT_TIMEOUT_MS and then waits
 // for the controller's "connection complete" event, which may never come
 // (ble_gap.c, ble_gap_master_timer: "XXX: Set a timer to reset the
@@ -154,9 +155,12 @@ static const char* TAG = "ble";
 static dev_t devs[ORBIT_MAX_DEVS];
 static portMUX_TYPE stats_mux = portMUX_INITIALIZER_UNLOCKED;
 static uint8_t own_addr_type;
-static bool connecting;
-static int64_t connecting_since_us;
+static bool connecting;      // a direct connect to a scanned device is in flight
+static bool wl_waiting;      // the controller is waiting for any bonded device (accept list)
+static int64_t connecting_since_us; // start of either of the above
 static bool connecting_cancel_logged;
+static int64_t hold_until_us;       // no new attempt before this (RECONNECT_HOLD_MS after a disconnect)
+static struct ble_npl_callout resume_co;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
@@ -201,6 +205,7 @@ static bool avoided(const ble_addr_t* addr) {
 static int gap_event(struct ble_gap_event* event, void* arg);
 static void discover_next_report(dev_t* d);
 static void start_discovery(dev_t* d);
+static void schedule(void);
 
 static double now_s(void) {
     return esp_timer_get_time() / 1e6;
@@ -310,10 +315,19 @@ static int bond_index(const ble_addr_t* addr) {
     return 0;
 }
 
+static const struct ble_gap_conn_params conn_params = {
+    .scan_itvl = 0x60,   // 60 ms: how often the controller listens while waiting
+    .scan_window = 0x30, // 30 ms  (HOGP 5.2.4, the first 30 s after a disconnect)
+    .itvl_min = CONN_ITVL,
+    .itvl_max = CONN_ITVL,
+    .latency = CONN_LATENCY,
+    .supervision_timeout = CONN_TIMEOUT,
+    .min_ce_len = 0,
+    .max_ce_len = 0,
+};
+
+// Pairing mode: look for any HID device (and bonded ones) ourselves.
 static void start_scan(void) {
-    if (connecting || scanning || free_slot() == NULL) {
-        return;
-    }
     // Active scan: some devices only put the HID UUID in the scan response.
     // No duplicate filtering: the controller would report each address once
     // per scan, so a device skipped while it was being avoided (or while it
@@ -327,7 +341,7 @@ static void start_scan(void) {
     int rc = ble_gap_disc(own_addr_type, BLE_HS_FOREVER, &params, gap_event, NULL);
     if (rc == 0) {
         scanning = true;
-        olog("M1 EVT t=%.3f scan start (%s)\n", now_s(), peers_only ? "bonded devices only" : "pairing");
+        olog("M1 EVT t=%.3f scan start (pairing)\n", now_s());
     } else if (rc != last_scan_rc) {
         // Retried every second by periodic_check(), so only report changes.
         olog("M1 EVT t=%.3f scan start failed rc=0x%x hci=0x%02x\n", now_s(), rc, hci(rc));
@@ -335,16 +349,89 @@ static void start_scan(void) {
     last_scan_rc = rc;
 }
 
+// Normal mode: hand the bonded addresses that are not connected to the
+// controller's accept list and ask it to connect to whichever shows up
+// first (HOGP 5.2.2; what Linux, Zephyr and RMK do). No advertisement
+// reaches us, so nothing here can miss one. One round lasts
+// CONNECT_TIMEOUT_MS; then NimBLE cancels, the connect event reports the
+// timeout, and schedule() starts the next round.
+static void start_wl_wait(void) {
+    ble_addr_t peers[CONFIG_BT_NIMBLE_MAX_BONDS];
+    ble_addr_t list[CONFIG_BT_NIMBLE_MAX_BONDS];
+    int n = 0, m = 0;
+    ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
+    for (int i = 0; i < n; i++) {
+        if (addr_in_use(&peers[i]) || avoided(&peers[i])) {
+            continue;
+        }
+        list[m] = peers[i];
+        // The accept list takes the plain public/random types.
+        list[m].type &= 1;
+        m++;
+    }
+    if (m == 0) {
+        return; // everything bonded is connected or excluded for now
+    }
+    int rc = ble_gap_wl_set(list, m);
+    if (rc != 0) {
+        olog("M1 EVT t=%.3f accept list set failed rc=0x%x\n", now_s(), rc);
+        return;
+    }
+    rc = ble_gap_connect(own_addr_type, NULL, CONNECT_TIMEOUT_MS, &conn_params, gap_event, NULL);
+    if (rc != 0) {
+        if (rc != last_scan_rc) {
+            olog("M1 EVT t=%.3f accept list wait failed rc=0x%x hci=0x%02x\n", now_s(), rc, hci(rc));
+        }
+        last_scan_rc = rc;
+        return;
+    }
+    last_scan_rc = 0;
+    wl_waiting = true;
+    connecting_since_us = esp_timer_get_time();
+    connecting_cancel_logged = false;
+    olog("M1 EVT t=%.3f waiting for %d bonded device(s)\n", now_s(), m);
+}
+
+// Decides what the radio should do now. Called after every event; the
+// controller runs at most one of: waiting on the accept list, scanning,
+// connecting. Nothing new starts while a link is still being set up
+// (encrypting or discovering), as nRF Desktop does: encryption and
+// discovery are one-at-a-time procedures anyway.
+static void schedule(void) {
+    if (connecting || wl_waiting || scanning || free_slot() == NULL) {
+        return;
+    }
+    if (esp_timer_get_time() < hold_until_us) {
+        return; // resume_co fires schedule() when the hold ends
+    }
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        dev_t* d = &devs[i];
+        if (d->connected && (!d->encrypted || (d->discovering && !d->discovery_finished))) {
+            return;
+        }
+    }
+    if (peers_only) {
+        start_wl_wait();
+    } else {
+        start_scan();
+    }
+}
+
+static void resume(struct ble_npl_event* ev) {
+    schedule();
+}
+
 static void periodic_check(struct ble_npl_event* ev) {
     int64_t now = esp_timer_get_time();
 
-    if (connecting && now - connecting_since_us > CONNECT_STUCK_RESET_US) {
+    if ((connecting || wl_waiting) && now - connecting_since_us > CONNECT_STUCK_RESET_US) {
         olog("M1 EVT t=%.3f connect attempt stuck for %d s, resetting the BLE host\n", now_s(),
              (int) ((now - connecting_since_us) / 1000000));
         ble_hs_sched_reset(BLE_HS_ETIMEOUT);
         return;
     }
-    if (connecting && now - connecting_since_us > CONNECT_STUCK_CANCEL_US && !connecting_cancel_logged) {
+    if ((connecting || wl_waiting) && now - connecting_since_us > CONNECT_STUCK_CANCEL_US &&
+        !connecting_cancel_logged) {
         int rc = ble_gap_conn_cancel();
         olog("M1 EVT t=%.3f connect attempt stuck for %d s, cancel rc=0x%x\n", now_s(),
              (int) ((now - connecting_since_us) / 1000000), rc);
@@ -392,17 +479,17 @@ static void periodic_check(struct ble_npl_event* ev) {
             give_up_on(d, "no encryption after 5 s", 0);
         }
     }
-    start_scan();
+    schedule();
 }
 
 static void pair_new_device_ev(struct ble_npl_event* ev) {
     olog("M1 EVT t=%.3f pair_new_device\n", now_s());
     peers_only = false;
-    if (scanning) {
-        ble_gap_disc_cancel();
-        scanning = false;
+    if (wl_waiting) {
+        ble_gap_conn_cancel(); // the connect event that follows leads to schedule()
+    } else {
+        schedule();
     }
-    start_scan();
 }
 
 static void clear_bonds_on_host(struct ble_npl_event* ev) {
@@ -414,6 +501,9 @@ static void clear_bonds_on_host(struct ble_npl_event* ev) {
         }
     }
     peers_only = false;
+    if (wl_waiting) {
+        ble_gap_conn_cancel();
+    }
 }
 
 static bool is_bonded(const ble_addr_t* addr) {
@@ -470,20 +560,11 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     portEXIT_CRITICAL(&stats_mux);
     d->ctx = new_gatt_ctx(d);
 
-    const struct ble_gap_conn_params params = {
-        .scan_itvl = 0x10,
-        .scan_window = 0x10,
-        .itvl_min = CONN_ITVL,
-        .itvl_max = CONN_ITVL,
-        .latency = CONN_LATENCY,
-        .supervision_timeout = CONN_TIMEOUT,
-        .min_ce_len = 0,
-        .max_ce_len = 0,
-    };
-    rc = ble_gap_connect(own_addr_type, &disc->addr, CONNECT_TIMEOUT_MS, &params, gap_event, NULL);
+    rc = ble_gap_connect(own_addr_type, &disc->addr, CONNECT_TIMEOUT_MS, &conn_params, gap_event, NULL);
     if (rc != 0) {
         EVT(d, "connect start failed rc=0x%x hci=0x%02x", rc, hci(rc));
-        start_scan();
+        d->in_use = false;
+        schedule();
         return;
     }
     d->in_use = true;
@@ -534,7 +615,9 @@ static void discovery_done(dev_t* d) {
         // 30 s avoidance.
         EVT(d, "nothing subscribed, dropping the link to retry");
         ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+        return;
     }
+    schedule(); // this link is set up; the radio may look for the next device
 }
 
 static int on_cccd_written(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
@@ -828,17 +911,62 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         return 0;
 
     case BLE_GAP_EVENT_CONNECT: {
-        connecting = false;
-        d = connecting_slot();
-        if (d == NULL) {
-            return 0;
-        }
-        if (event->connect.status != 0) {
-            EVT(d, "connect failed status=0x%x hci=0x%02x", event->connect.status, hci(event->connect.status));
-            set_last_event("CONNFAIL", (int) (d - devs), event->connect.status);
-            d->in_use = false;
-            start_scan();
-            return 0;
+        if (wl_waiting) {
+            wl_waiting = false;
+            if (event->connect.status != 0) {
+                // The round ended (timeout, or cancelled for pairing mode).
+                if (event->connect.status != BLE_HS_ETIMEOUT) {
+                    olog("M1 EVT t=%.3f accept list wait ended status=0x%x\n", now_s(), event->connect.status);
+                }
+                schedule();
+                return 0;
+            }
+            // A bonded device showed up. Its slot: the one it had last time
+            // (keeps its totals), else a free one.
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(event->connect.conn_handle, &desc) != 0) {
+                ble_gap_terminate(event->connect.conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+                schedule();
+                return 0;
+            }
+            d = NULL;
+            for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+                if (!devs[i].in_use && ble_addr_cmp(&devs[i].addr, &desc.peer_id_addr) == 0) {
+                    d = &devs[i];
+                }
+            }
+            if (d == NULL) {
+                d = free_slot();
+            }
+            if (d == NULL) {
+                ble_gap_terminate(event->connect.conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+                return 0;
+            }
+            uint32_t gen = d->gen + 1;
+            bool same_device = ble_addr_cmp(&d->addr, &desc.peer_id_addr) == 0;
+            portENTER_CRITICAL(&stats_mux);
+            memset(d, 0, offsetof(dev_t, total_reports));
+            d->gen = gen;
+            d->addr = desc.peer_id_addr;
+            d->in_use = true;
+            if (!same_device) {
+                d->stalls = 0;
+            }
+            portEXIT_CRITICAL(&stats_mux);
+            d->ctx = new_gatt_ctx(d);
+        } else {
+            connecting = false;
+            d = connecting_slot();
+            if (d == NULL) {
+                return 0;
+            }
+            if (event->connect.status != 0) {
+                EVT(d, "connect failed status=0x%x hci=0x%02x", event->connect.status, hci(event->connect.status));
+                set_last_event("CONNFAIL", (int) (d - devs), event->connect.status);
+                d->in_use = false;
+                schedule();
+                return 0;
+            }
         }
         portENTER_CRITICAL(&stats_mux);
         d->connected = true;
@@ -865,7 +993,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             EVT(d, "security start failed rc=0x%x, retrying", rc);
             d->sec_pending = true;
         }
-        start_scan();
+        schedule(); // holds until this link is encrypted and discovered
         return 0;
     }
 
@@ -881,8 +1009,19 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // and it silently gives up after three tries anyway, so this
             // disconnect for a handle we never saw is the only notice of the
             // failed attempt (f90e28c report: 8 stuck attempts in 20 min).
+            const ble_addr_t* peer = &event->disconnect.conn.peer_id_addr;
+            if (wl_waiting) {
+                // The accept-list wait produced a link that died at once.
+                // NimBLE has already left the connect procedure, so the
+                // wait is over; start the next round.
+                wl_waiting = false;
+                olog("M1 EVT t=%.3f addr=..:%02x:%02x connect failed before the connect event reason=0x%x hci=0x%02x\n",
+                     now_s(), peer->val[1], peer->val[0], event->disconnect.reason, hci(event->disconnect.reason));
+                schedule();
+                return 0;
+            }
             d = connecting ? connecting_slot() : NULL;
-            if (d == NULL || ble_addr_cmp(&d->addr, &event->disconnect.conn.peer_id_addr) != 0) {
+            if (d == NULL || ble_addr_cmp(&d->addr, peer) != 0) {
                 olog("M1 EVT t=%.3f disconnect for an unknown link h=%u reason=0x%x\n", now_s(),
                      event->disconnect.conn.conn_handle, event->disconnect.reason);
                 return 0;
@@ -895,7 +1034,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             d->in_use = false;
             d->gen++;
             portEXIT_CRITICAL(&stats_mux);
-            start_scan();
+            schedule();
             return 0;
         }
         EVT(d, "disconnected reason=0x%x hci=0x%02x", event->disconnect.reason, hci(event->disconnect.reason));
@@ -912,7 +1051,10 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
                 wake();
             }
         }
-        start_scan(); // reconnect
+        // Let the device settle before the next attempt (RMK waits 0.5 s,
+        // upstream's BLE firmware 1 s).
+        hold_until_us = esp_timer_get_time() + RECONNECT_HOLD_MS * 1000;
+        ble_npl_callout_reset(&resume_co, ble_npl_time_ms_to_ticks32(RECONNECT_HOLD_MS));
         return 0;
 
     case BLE_GAP_EVENT_CONN_UPDATE:
@@ -1058,7 +1200,9 @@ static void on_sync(void) {
     }
     wake();
     connecting = false;
+    wl_waiting = false;
     scanning = false;
+    hold_until_us = 0;
 
     int rc = ble_hs_util_ensure_addr(0);
     assert(rc == 0);
@@ -1073,13 +1217,14 @@ static void on_sync(void) {
         olog("M1 EVT t=%.3f bond %d addr=..:%02x:%02x kind=%s\n", now_s(), i + 1, peers[i].val[1], peers[i].val[0],
              addr_kind(&peers[i]));
     }
-    start_scan();
+    schedule();
 }
 
 static void on_reset(int reason) {
     olog("M1 EVT t=%.3f ble host reset reason=%d\n", now_s(), reason);
     scanning = false;
     connecting = false;
+    wl_waiting = false;
 }
 
 static void host_task(void* param) {
@@ -1116,6 +1261,7 @@ void orbit_ble_start(TaskHandle_t wake) {
     ble_npl_event_init(&periodic_ev, periodic_check, NULL);
     ble_npl_event_init(&pair_ev, pair_new_device_ev, NULL);
     ble_npl_event_init(&clear_bonds_ev, clear_bonds_on_host, NULL);
+    ble_npl_callout_init(&resume_co, nimble_port_get_dflt_eventq(), resume, NULL);
     nimble_port_freertos_init(host_task);
 }
 
@@ -1182,6 +1328,10 @@ int orbit_ble_connected_count(void) {
 
 bool orbit_ble_scanning(void) {
     return scanning;
+}
+
+bool orbit_ble_waiting(void) {
+    return wl_waiting;
 }
 
 bool orbit_ble_pairing(void) {
