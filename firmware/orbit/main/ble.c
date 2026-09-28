@@ -34,6 +34,12 @@
 #define MAX_CHRS     32
 #define CONNECT_TIMEOUT_MS 10000 // one direct connect, or one round of accept-list waiting
 #define RECONNECT_HOLD_MS 500     // pause after a disconnect before the next attempt (RMK, upstream BLE)
+// While waiting for bonded devices the controller listens 30 ms out of
+// every 60 ms for the first 30 s after a disconnect or start (HOGP 5.2.4),
+// then 30 ms out of every 300 ms. HOGP's long-term figure (11.25 ms per
+// 1.28 s) is for battery-powered hosts; the M5Dial is USB-powered and a
+// woken keyboard should connect within a second.
+#define FAST_WAIT_US (30 * 1000000)
 // NimBLE cancels a connect attempt after CONNECT_TIMEOUT_MS and then waits
 // for the controller's "connection complete" event, which may never come
 // (ble_gap.c, ble_gap_master_timer: "XXX: Set a timer to reset the
@@ -163,6 +169,7 @@ static bool wl_waiting;      // the controller is waiting for any bonded device 
 static int64_t connecting_since_us; // start of either of the above
 static bool connecting_cancel_logged;
 static int64_t hold_until_us;       // no new attempt before this (RECONNECT_HOLD_MS after a disconnect)
+static int64_t fast_until_us;       // listen at the high duty cycle until then
 static struct ble_npl_callout resume_co;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
@@ -345,7 +352,7 @@ static int bond_index(const ble_addr_t* addr) {
 
 static const struct ble_gap_conn_params conn_params = {
     .scan_itvl = 0x60,   // 60 ms: how often the controller listens while waiting
-    .scan_window = 0x30, // 30 ms  (HOGP 5.2.4, the first 30 s after a disconnect)
+    .scan_window = 0x30, // 30 ms
     .itvl_min = CONN_ITVL,
     .itvl_max = CONN_ITVL,
     .latency = CONN_LATENCY,
@@ -405,7 +412,12 @@ static void start_wl_wait(void) {
         olog("M1 EVT t=%.3f accept list set failed rc=0x%x\n", now_s(), rc);
         return;
     }
-    rc = ble_gap_connect(own_addr_type, NULL, CONNECT_TIMEOUT_MS, &conn_params, gap_event, NULL);
+    bool fast = esp_timer_get_time() < fast_until_us;
+    struct ble_gap_conn_params params = conn_params;
+    if (!fast) {
+        params.scan_itvl = 0x1E0; // 300 ms
+    }
+    rc = ble_gap_connect(own_addr_type, NULL, CONNECT_TIMEOUT_MS, &params, gap_event, NULL);
     if (rc != 0) {
         if (rc != last_scan_rc) {
             olog("M1 EVT t=%.3f accept list wait failed rc=0x%x hci=0x%02x\n", now_s(), rc, hci(rc));
@@ -417,7 +429,8 @@ static void start_wl_wait(void) {
     wl_waiting = true;
     connecting_since_us = esp_timer_get_time();
     connecting_cancel_logged = false;
-    olog("M1 EVT t=%.3f waiting for %d bonded device(s)\n", now_s(), m);
+    olog("M1 EVT t=%.3f waiting for %d bonded device(s), listening %s\n", now_s(), m,
+         fast ? "30/60 ms" : "30/300 ms");
 }
 
 // Decides what the radio should do now. Called after every event; the
@@ -1088,6 +1101,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         // Let the device settle before the next attempt (RMK waits 0.5 s,
         // upstream's BLE firmware 1 s).
         hold_until_us = esp_timer_get_time() + RECONNECT_HOLD_MS * 1000;
+        fast_until_us = esp_timer_get_time() + FAST_WAIT_US;
         ble_npl_callout_reset(&resume_co, ble_npl_time_ms_to_ticks32(RECONNECT_HOLD_MS));
         return 0;
 
@@ -1237,6 +1251,7 @@ static void on_sync(void) {
     wl_waiting = false;
     scanning = false;
     hold_until_us = 0;
+    fast_until_us = esp_timer_get_time() + FAST_WAIT_US;
 
     int rc = ble_hs_util_ensure_addr(0);
     assert(rc == 0);
