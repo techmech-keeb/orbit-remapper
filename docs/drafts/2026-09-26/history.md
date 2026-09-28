@@ -71,6 +71,7 @@ finalized: false
 | 42 | ファームの作り方（2026-09-27） | 本家のソースを確認し、M1（本家そのまま）→ M2（Orbit の芯）→ M3（画面）の 3 区切りと、層の分け方を設計（[implementation-design.md](../2026-09-27/implementation-design.md)）。設計上の 6 つの決定をユーザーが選択（requirements I1〜I7）。機器の番号は住所に固定し、付け替え操作を最初から持つ（I4）。 |
 | 43 | M1 の依頼書（2026-09-27） | 本家をそのまま動かす段階の依頼書 [m1-brief.md](../2026-09-27/m1-brief.md) を作成。USB は HID 2 つ＋ログ用 CDC の複合機器、書き込みモードに戻る手段を必須にした。VID/PID は M1 では本家のまま（Q35）。 |
 | 44 | M1 の実装と試験（2026-09-27〜28） | `firmware/orbit/`（PR #9）。本家コア無改造で、2 台を 7.50 ms で受けて USB HID として出し、本家の設定ツールで設定・保存できた。A1〜A4、A7、A9、A10 合格、A8 は測り直し、A5・A6 未確認（[m1-results.md](../2026-09-27/m1-results.md)）。分かったこと：S3 の USB 送信口は 5 本、製品名に `Bluetooth` が要る、再起動で USB シリアルはリセットされない。 |
+| 45 | 「S3 で複数機器をすんなり検出・接続する先行事例を調べて」（2026-09-27〜28） | 本家 HID Remapper の Bluetooth 版（Zephyr、MIT）、HOGP、Linux・BlueZ、Zephyr、nRF Desktop、ZMK、RMK、ESP32 の実装を調べた（[ble-connect-prior-art.md](../2026-09-28/ble-connect-prior-art.md)）。実績のある実装の型は共通で、Orbit は多くの点で型どおりだが、NimBLE の自動再試行とのぶつかり、探索中のスキャン、探索を毎回することが型から外れる。反映は 4 段階で進める（[ble-connect-plan.md](../2026-09-28/ble-connect-plan.md)）。 |
 
 ## 見送り理由を捏造しない
 

@@ -41,6 +41,10 @@
 #define CONNECT_STUCK_CANCEL_US (15 * 1000000)
 #define CONNECT_STUCK_RESET_US  (25 * 1000000)
 #define ENC_WAIT_US (5 * 1000000)
+// The first GATT request on a link made right after the device dropped the
+// previous one sometimes gets no answer until the 30 s ATT timeout
+// (a195bc8 report, problem G'). A fresh link answers within 0.5 s.
+#define DISCOVERY_STALL_US (5 * 1000000)
 
 // Connection parameters requested in the connection request (q31-results.md
 // §5: asking after connecting is refused for the second device).
@@ -72,9 +76,21 @@ typedef struct {
     uint8_t report_type;
 } chr_t;
 
+typedef struct dev dev_t;
+
+// Handed to NimBLE as the callback argument of every GATT procedure. A
+// procedure of a link that has since gone (and whose conn_handle the next
+// link may reuse) is told apart by the generation.
 typedef struct {
+    dev_t* d;
+    uint32_t gen;
+} gatt_ctx_t;
+
+struct dev {
     // Connection state; slot is in use when connecting or connected.
     bool in_use;
+    uint32_t gen;      // bumped on every connect and disconnect
+    gatt_ctx_t* ctx;   // context of this link's GATT procedures
     bool connected;
     uint16_t conn_handle;
     ble_addr_t addr;
@@ -85,6 +101,7 @@ typedef struct {
 
     bool discovering;
     bool discovery_finished;
+    int64_t discovery_progress_us; // last GATT callback of this link
     bool rediscover;       // encryption came up while discovering unencrypted
     bool peer_allows_itvl; // latest device request includes our interval
     bool reasserted;       // already asked again for our interval
@@ -108,7 +125,30 @@ typedef struct {
     uint32_t gaps[GAP_BUCKETS];
     uint32_t total_reports;
     uint32_t disconnects;
-} dev_t;
+    uint8_t stalls; // discovery stalls in a row on this slot's device (kept across reconnects)
+};
+
+// Stale procedures die within the 30 s ATT timeout, so a small ring suffices.
+static gatt_ctx_t gatt_ctxs[8];
+static unsigned gatt_ctx_next;
+
+static gatt_ctx_t* new_gatt_ctx(dev_t* d) {
+    gatt_ctx_t* c = &gatt_ctxs[gatt_ctx_next++ % (sizeof(gatt_ctxs) / sizeof(gatt_ctxs[0]))];
+    c->d = d;
+    c->gen = d->gen;
+    return c;
+}
+
+// True when the callback belongs to the link the slot currently holds.
+static dev_t* gatt_ctx_dev(void* arg, uint16_t conn_handle) {
+    gatt_ctx_t* c = arg;
+    dev_t* d = c->d;
+    if (!d->connected || d->conn_handle != conn_handle || c->gen != d->gen) {
+        return NULL;
+    }
+    d->discovery_progress_us = esp_timer_get_time();
+    return d;
+}
 
 static const char* TAG = "ble";
 static dev_t devs[ORBIT_MAX_DEVS];
@@ -230,6 +270,23 @@ static dev_t* free_slot(void) {
     return NULL;
 }
 
+// "public", "static", "rpa" (resolvable private, changes over time) or
+// "nrpa". Bonded reconnection through the controller's accept list needs a
+// public or static address, so the kind is logged for each bond and link
+// (ble-connect-plan.md, stage 1).
+static const char* addr_kind(const ble_addr_t* a) {
+    switch (a->type) {
+    case BLE_ADDR_PUBLIC:
+    case BLE_ADDR_PUBLIC_ID:
+        return "public";
+    case BLE_ADDR_RANDOM:
+    case BLE_ADDR_RANDOM_ID:
+        return BLE_ADDR_IS_RPA(a) ? "rpa" : BLE_ADDR_IS_NRPA(a) ? "nrpa" : "static";
+    default:
+        return "?";
+    }
+}
+
 static void print_params(dev_t* d, const char* what) {
     struct ble_gap_conn_desc desc;
     if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
@@ -301,6 +358,26 @@ static void periodic_check(struct ble_npl_event* ev) {
             if (rc == 0) {
                 d->sec_pending = false;
                 EVT(d, "security started");
+            }
+        }
+    }
+
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        dev_t* d = &devs[i];
+        if (d->connected && d->discovering && !d->discovery_finished &&
+            now - d->discovery_progress_us > DISCOVERY_STALL_US) {
+            d->discovery_finished = true; // so this fires once per link
+            d->stalls++;
+            if (d->stalls == 1) {
+                EVT(d, "discovery stalled for %d s, dropping the link to retry", DISCOVERY_STALL_US / 1000000);
+                ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            } else {
+                // Reconnecting every 5 s never got an answer out of a
+                // reset MD600 (f102c45 report: 10 rounds in a minute),
+                // while a link left alone recovered after the 30 s ATT
+                // timeout (a195bc8). Second stall in a row: keep the
+                // link and let the ATT timeout end the discovery.
+                EVT(d, "discovery stalled again (%u in a row), keeping the link until the ATT timeout", d->stalls);
             }
         }
     }
@@ -381,10 +458,17 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     }
     scanning = false;
 
+    uint32_t gen = d->gen + 1;
+    bool same_device = ble_addr_cmp(&d->addr, &disc->addr) == 0;
     portENTER_CRITICAL(&stats_mux);
     memset(d, 0, offsetof(dev_t, total_reports)); // keep the slot's running totals
+    d->gen = gen;
     d->addr = disc->addr;
+    if (!same_device) {
+        d->stalls = 0;
+    }
     portEXIT_CRITICAL(&stats_mux);
+    d->ctx = new_gatt_ctx(d);
 
     const struct ble_gap_conn_params params = {
         .scan_itvl = 0x10,
@@ -406,7 +490,7 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     connecting = true;
     connecting_since_us = esp_timer_get_time();
     connecting_cancel_logged = false;
-    EVT(d, "connecting rssi=%d adv_type=%u", disc->rssi, disc->event_type);
+    EVT(d, "connecting rssi=%d adv_type=%u addr_kind=%s", disc->rssi, disc->event_type, addr_kind(&disc->addr));
 }
 
 static dev_t* connecting_slot(void) {
@@ -435,17 +519,29 @@ static void restart_discovery_if_unsubscribed(dev_t* d) {
 
 static void discovery_done(dev_t* d) {
     d->discovery_finished = true;
+    if (d->subscribed > 0) {
+        d->stalls = 0;
+    }
     EVT(d, "subscribed %d input report(s)", d->subscribed);
     if (d->rediscover) {
         restart_discovery_if_unsubscribed(d);
+        return;
+    }
+    if (d->subscribed == 0 && d->encrypted) {
+        // Discovery ran but found nothing to subscribe to (a failed or
+        // interrupted procedure). The link is useless as it is; drop it and
+        // let the reconnect discover afresh. Not the device's fault, so no
+        // 30 s avoidance.
+        EVT(d, "nothing subscribed, dropping the link to retry");
+        ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     }
 }
 
 static int on_cccd_written(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
                            void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0) {
@@ -461,9 +557,9 @@ static int on_cccd_written(uint16_t conn_handle, const struct ble_gatt_error* er
 
 static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
                          void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0 && attr->om != NULL && OS_MBUF_PKTLEN(attr->om) >= 2) {
@@ -477,7 +573,7 @@ static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* erro
     }
     if (c->report_type == REPORT_TYPE_INPUT && (c->props & BLE_GATT_CHR_PROP_NOTIFY) && c->cccd_handle != 0) {
         static const uint8_t notify_on[2] = { 0x01, 0x00 };
-        int rc = ble_gattc_write_flat(conn_handle, c->cccd_handle, notify_on, sizeof(notify_on), on_cccd_written, d);
+        int rc = ble_gattc_write_flat(conn_handle, c->cccd_handle, notify_on, sizeof(notify_on), on_cccd_written, d->ctx);
         if (rc == 0) {
             return 0;
         }
@@ -490,9 +586,9 @@ static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* erro
 
 static int on_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint16_t chr_val_handle,
                   const struct ble_gatt_dsc* dsc, void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0) {
@@ -504,7 +600,7 @@ static int on_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint
         return 0;
     }
     if (error->status == BLE_HS_EDONE && c->ref_handle != 0) {
-        int rc = ble_gattc_read(conn_handle, c->ref_handle, on_report_ref, d);
+        int rc = ble_gattc_read(conn_handle, c->ref_handle, on_report_ref, d->ctx);
         if (rc == 0) {
             return 0;
         }
@@ -527,7 +623,7 @@ static void discover_next_report(dev_t* d) {
         }
         c->cccd_handle = 0;
         c->ref_handle = 0;
-        int rc = ble_gattc_disc_all_dscs(d->conn_handle, c->val_handle, c->end_handle, on_dsc, d);
+        int rc = ble_gattc_disc_all_dscs(d->conn_handle, c->val_handle, c->end_handle, on_dsc, d->ctx);
         if (rc == 0) {
             return;
         }
@@ -538,9 +634,9 @@ static void discover_next_report(dev_t* d) {
 
 static int on_report_map(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
                          void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     orbit_report_map_t* m = &d->report_map;
     if (error->status == 0 && attr->om != NULL) {
@@ -572,9 +668,9 @@ static void discover_next_svc_chrs(dev_t* d);
 
 static int on_chr(uint16_t conn_handle, const struct ble_gatt_error* error, const struct ble_gatt_chr* chr,
                   void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     if (error->status == 0) {
         if (d->n_chrs < MAX_CHRS) {
@@ -607,7 +703,7 @@ static int on_chr(uint16_t conn_handle, const struct ble_gatt_error* error, cons
 
 static void discover_next_svc_chrs(dev_t* d) {
     if (d->cur_svc < d->n_svcs) {
-        int rc = ble_gattc_disc_all_chrs(d->conn_handle, d->svc_start[d->cur_svc], d->svc_end[d->cur_svc], on_chr, d);
+        int rc = ble_gattc_disc_all_chrs(d->conn_handle, d->svc_start[d->cur_svc], d->svc_end[d->cur_svc], on_chr, d->ctx);
         if (rc == 0) {
             return;
         }
@@ -616,7 +712,7 @@ static void discover_next_svc_chrs(dev_t* d) {
     // All characteristics known: read the Report Map, then set up each Report.
     d->report_map.len = 0;
     if (d->report_map_handle != 0) {
-        int rc = ble_gattc_read_long(d->conn_handle, d->report_map_handle, 0, on_report_map, d);
+        int rc = ble_gattc_read_long(d->conn_handle, d->report_map_handle, 0, on_report_map, d->ctx);
         if (rc == 0) {
             return;
         }
@@ -630,9 +726,9 @@ static void discover_next_svc_chrs(dev_t* d) {
 
 static int on_svc(uint16_t conn_handle, const struct ble_gatt_error* error, const struct ble_gatt_svc* svc,
                   void* arg) {
-    dev_t* d = arg;
-    if (!d->connected || d->conn_handle != conn_handle) {
-        return 0;
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
     }
     if (error->status == 0) {
         if (d->n_svcs < MAX_HID_SVCS) {
@@ -657,7 +753,8 @@ static void start_discovery(dev_t* d) {
         return;
     }
     d->discovering = true;
-    int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_HID_SERVICE), on_svc, d);
+    d->discovery_progress_us = esp_timer_get_time();
+    int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_HID_SERVICE), on_svc, d->ctx);
     if (rc != 0) {
         EVT(d, "service discovery start failed rc=0x%x", rc);
     }
@@ -749,6 +846,13 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         d->connected_us = esp_timer_get_time();
         portEXIT_CRITICAL(&stats_mux);
         print_params(d, "connected");
+        {
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
+                EVT(d, "peer id=%s ..:%02x:%02x ota=%s", addr_kind(&desc.peer_id_addr), desc.peer_id_addr.val[1],
+                    desc.peer_id_addr.val[0], addr_kind(&desc.peer_ota_addr));
+            }
+        }
         set_last_event("CONN", (int) (d - devs), -1);
         // HOGP devices may not send reports until the link is encrypted
         // (prior-art.md §4.29), so start it ourselves.
@@ -768,6 +872,30 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
     case BLE_GAP_EVENT_DISCONNECT:
         d = dev_by_handle(event->disconnect.conn.conn_handle);
         if (d == NULL) {
+            // NimBLE reads the peer's features and version before it posts
+            // the connect event. If the link dies meanwhile (0x3E, the
+            // device did not answer its first packets), the host drops the
+            // failed read on the floor assuming its own reattempt follows
+            // (ble_gap_rx_rd_rem_sup_feat_complete: "Reconnection will
+            // automatically happen"). That reattempt is off (sdkconfig.defaults),
+            // and it silently gives up after three tries anyway, so this
+            // disconnect for a handle we never saw is the only notice of the
+            // failed attempt (f90e28c report: 8 stuck attempts in 20 min).
+            d = connecting ? connecting_slot() : NULL;
+            if (d == NULL || ble_addr_cmp(&d->addr, &event->disconnect.conn.peer_id_addr) != 0) {
+                olog("M1 EVT t=%.3f disconnect for an unknown link h=%u reason=0x%x\n", now_s(),
+                     event->disconnect.conn.conn_handle, event->disconnect.reason);
+                return 0;
+            }
+            EVT(d, "connect failed before the connect event reason=0x%x hci=0x%02x", event->disconnect.reason,
+                hci(event->disconnect.reason));
+            set_last_event("CONNFAIL", (int) (d - devs), hci(event->disconnect.reason));
+            connecting = false;
+            portENTER_CRITICAL(&stats_mux);
+            d->in_use = false;
+            d->gen++;
+            portEXIT_CRITICAL(&stats_mux);
+            start_scan();
             return 0;
         }
         EVT(d, "disconnected reason=0x%x hci=0x%02x", event->disconnect.reason, hci(event->disconnect.reason));
@@ -775,6 +903,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         portENTER_CRITICAL(&stats_mux);
         d->connected = false;
         d->in_use = false;
+        d->gen++;
         d->disconnects++;
         portEXIT_CRITICAL(&stats_mux);
         {
@@ -940,6 +1069,10 @@ static void on_sync(void) {
     ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
     peers_only = n > 0; // nothing bonded yet: accept any HID device, as upstream
     olog("M1 EVT t=%.3f ble ready bonds=%d\n", now_s(), n);
+    for (int i = 0; i < n; i++) {
+        olog("M1 EVT t=%.3f bond %d addr=..:%02x:%02x kind=%s\n", now_s(), i + 1, peers[i].val[1], peers[i].val[0],
+             addr_kind(&peers[i]));
+    }
     start_scan();
 }
 

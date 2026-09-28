@@ -98,3 +98,56 @@ CLEAR/REFLEXの旧CADやPDF、A〜FおよびE2の比較画像は、今回取得�
 - Espressif FAQ（BLE / Bluetooth）: https://github.com/espressif/esp-faq/blob/a71fa4f/docs/en/software-framework/ble-bt.rst
 - ESP-IDF ble_multi_conn_cent の README: https://github.com/espressif/esp-idf/blob/master/examples/bluetooth/nimble/ble_multi_conn/ble_multi_conn_cent/README.md
 
+## BLE の検出・接続の先行事例（2026-09-28 確認）
+
+[ble-connect-prior-art.md](../2026-09-28/ble-connect-prior-art.md) の出典。いずれも最終確認日 2026-09-28（取得は 2026-09-27〜28）。ブランチ名だけのものは、その日の先端を読んだ。
+
+仕様：
+
+- Bluetooth SIG, HID over GATT Profile 1.0（2011-12-27 採択）: https://www.bluetooth.org/docman/handlers/downloaddoc.ashx?doc_id=245141
+- Bluetooth SIG, HID over GATT Profile の仕様ページ: https://www.bluetooth.com/specifications/specs/hid-over-gatt-profile/
+- Bluetooth SIG, Reconnection Configuration Service 1.0（Withdrawn）: https://www.bluetooth.com/specifications/specs/reconnection-configuration-service-1-0/
+- Bluetooth Core 5.4 Vol 3 Part G（GATT）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/host/generic-attribute-profile--gatt-.html
+- Apple Accessory Design Guidelines: https://developer.apple.com/accessories/Accessory-Design-Guidelines.pdf
+
+OS とスタック：
+
+- Linux `net/bluetooth/hci_sync.c`・`hci_event.c`（master）: https://github.com/torvalds/linux/blob/master/net/bluetooth/hci_sync.c
+- BlueZ `src/shared/gatt-client.c`・`profiles/input/hog-lib.c`・`src/main.conf`（master）: https://github.com/bluez/bluez
+- Android `BluetoothDevice`: https://developer.android.com/reference/android/bluetooth/BluetoothDevice
+- Zephyr `include/zephyr/bluetooth/conn.h`・`subsys/bluetooth/host/scan.c`・`Kconfig.gatt`（main）: https://github.com/zephyrproject-rtos/zephyr
+- apache/mynewt-nimble `nimble/host/include/host/ble_gap.h`（master）: https://github.com/apache/mynewt-nimble
+- ESP-IDF v5.5.5 の `components/bt/host/nimble/`（手元のソースで確認）: https://github.com/espressif/esp-idf/tree/v5.5.5/components/bt/host/nimble
+
+ファームウェア：
+
+- jfedor2/hid-remapper `firmware-bluetooth/src/main.cc`（最終変更 61b3f74、2025-01-17）: https://github.com/jfedor2/hid-remapper/blob/master/firmware-bluetooth/src/main.cc
+- 同 BLUETOOTH.md: https://github.com/jfedor2/hid-remapper/blob/master/BLUETOOTH.md
+- 同 ブランチ `bluetooth-classic`（d4042f5、7df72c1、2026-08-29）: https://github.com/jfedor2/hid-remapper/tree/bluetooth-classic
+- nrfconnect/sdk-nrf（main 5d1f559）の `applications/nrf_desktop/src/modules/ble_scan.c`・`ble_discovery.c`・`Kconfig.ble_scan`、`samples/bluetooth/central_hids/src/main.c`、`subsys/bluetooth/scan.c`・`Kconfig.scan`: https://github.com/nrfconnect/sdk-nrf
+- zmkfirmware/zmk（main 5b51501）の `app/src/split/bluetooth/central.c`・`app/src/ble.c`: https://github.com/zmkfirmware/zmk
+- RMK（手元のクローン、568770f、2026-09-04）の `rmk/src/split/ble/central.rs`・`rmk/src/dongle/mod.rs`: https://github.com/techmech-keeb/rmk
+- embassy-rs/trouble（main b6043f5）の `host/src/central.rs`: https://github.com/embassy-rs/trouble
+- darthcloud/BlueRetro（e1a9831、2025-12-14 アーカイブ）: https://github.com/darthcloud/BlueRetro
+- espressif/esp-iot-solution `components/bluetooth/ble_conn_mgr`（v1.3.1、2026-09-09）: https://github.com/espressif/esp-iot-solution/tree/master/components/bluetooth/ble_conn_mgr
+- h2zero/esp-nimble-cpp（master、2026-09-18）: https://github.com/h2zero/esp-nimble-cpp
+- finger563/esp-usb-ble-hid: https://github.com/finger563/esp-usb-ble-hid
+- esp32beans/BLE_HID_Client: https://github.com/esp32beans/BLE_HID_Client
+- ncmro7/MI-RC003-ESP32-Bridge: https://github.com/ncmro7/MI-RC003-ESP32-Bridge
+- ESPHome ESP32 BLE: https://esphome.io/components/esp32_ble/
+
+ESP-IDF の issue（2026-09-28 時点の状態）：
+
+- #19011（esp_hidh が Report Map を読まない）: https://github.com/espressif/esp-idf/issues/19011
+- #11312（esp_hidh で 2 台目のデータが読めない、Open）: https://github.com/espressif/esp-idf/issues/11312
+- #18893（S3 central で暗号化後に GATT が流れない、Open）: https://github.com/espressif/esp-idf/issues/18893
+- #19057（S3 で暗号化前のデータ長変更で暗号化が時間切れ、Open）: https://github.com/espressif/esp-idf/issues/19057
+- #19030（NimBLE の NVS 保存が上書きを保存しない、Open）: https://github.com/espressif/esp-idf/issues/19030
+- #18635（S3 central の RPA、Open）: https://github.com/espressif/esp-idf/issues/18635
+- #18063（C3 でスキャン中の接続で落ちる、Open）: https://github.com/espressif/esp-idf/issues/18063
+- #14053（S3 NimBLE の 0x28 切断、Open）: https://github.com/espressif/esp-idf/issues/14053
+
+市販品：
+
+- Logitech, Logi Bolt white paper: https://www.logitech.com/content/dam/logitech/en/business/pdf/logi-bolt-white-paper.pdf
+- Keychron, Wireless mouse and keyboard not working: https://www.keychron.com/blogs/news/keychron-wireless-mouse-and-keyboard-not-working
