@@ -29,3 +29,8 @@ CONFIG_BT_NIMBLE_GATT_MAX_PROCS=8
 CONFIG_BT_NIMBLE_NVS_PERSIST=y
 CONFIG_BT_NIMBLE_SM_SC=y
 CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y
+
+# NimBLE's own retry after a failed connection establishment (0x3E) would
+# run alongside ble.c's reconnect, which already handles the disconnect
+# (ble-connect-prior-art.md §4). Only ble.c starts connections.
+CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT=n
