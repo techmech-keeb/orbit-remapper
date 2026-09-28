@@ -854,6 +854,30 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
     case BLE_GAP_EVENT_DISCONNECT:
         d = dev_by_handle(event->disconnect.conn.conn_handle);
         if (d == NULL) {
+            // NimBLE reads the peer's features and version before it posts
+            // the connect event. If the link dies meanwhile (0x3E, the
+            // device did not answer its first packets), the host drops the
+            // failed read on the floor assuming its own reattempt follows
+            // (ble_gap_rx_rd_rem_sup_feat_complete: "Reconnection will
+            // automatically happen"). That reattempt is off (sdkconfig.defaults),
+            // and it silently gives up after three tries anyway, so this
+            // disconnect for a handle we never saw is the only notice of the
+            // failed attempt (f90e28c report: 8 stuck attempts in 20 min).
+            d = connecting ? connecting_slot() : NULL;
+            if (d == NULL || ble_addr_cmp(&d->addr, &event->disconnect.conn.peer_id_addr) != 0) {
+                olog("M1 EVT t=%.3f disconnect for an unknown link h=%u reason=0x%x\n", now_s(),
+                     event->disconnect.conn.conn_handle, event->disconnect.reason);
+                return 0;
+            }
+            EVT(d, "connect failed before the connect event reason=0x%x hci=0x%02x", event->disconnect.reason,
+                hci(event->disconnect.reason));
+            set_last_event("CONNFAIL", (int) (d - devs), hci(event->disconnect.reason));
+            connecting = false;
+            portENTER_CRITICAL(&stats_mux);
+            d->in_use = false;
+            d->gen++;
+            portEXIT_CRITICAL(&stats_mux);
+            start_scan();
             return 0;
         }
         EVT(d, "disconnected reason=0x%x hci=0x%02x", event->disconnect.reason, hci(event->disconnect.reason));
