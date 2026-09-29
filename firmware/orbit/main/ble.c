@@ -340,7 +340,11 @@ static const char* addr_kind(const ble_addr_t* a) {
 static uint32_t key_tag(const ble_addr_t* addr) {
     struct ble_store_key_sec key = { .peer_addr = *addr, .idx = 0 };
     struct ble_store_value_sec value;
-    if (ble_store_read_our_sec(&key, &value) != 0 || !value.ltk_present) {
+    // As central we encrypt with the key the device distributed (peer_sec).
+    // With legacy pairing our own record may hold no LTK at all (a0d8f9e
+    // report: IST Trackball read as "no key stored"), so look there first.
+    if ((ble_store_read_peer_sec(&key, &value) != 0 || !value.ltk_present) &&
+        (ble_store_read_our_sec(&key, &value) != 0 || !value.ltk_present)) {
         return 0;
     }
     uint32_t h = 2166136261u;
