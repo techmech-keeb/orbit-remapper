@@ -136,6 +136,7 @@ struct dev {
     uint32_t total_reports;
     uint32_t disconnects;
     uint8_t stalls; // discovery stalls in a row on this slot's device (kept across reconnects)
+    uint32_t key_tag; // fingerprint of the stored LTK when the link came up (0: none), never logged
 };
 
 // Stale procedures die within the 30 s ATT timeout, so a small ring suffices.
@@ -325,6 +326,22 @@ static const char* addr_kind(const ble_addr_t* a) {
     default:
         return "?";
     }
+}
+
+// A fingerprint of the key we hold for addr, to tell afterwards whether
+// the link was encrypted with it or a new pairing replaced it. Only
+// compared, never logged.
+static uint32_t key_tag(const ble_addr_t* addr) {
+    struct ble_store_key_sec key = { .peer_addr = *addr, .idx = 0 };
+    struct ble_store_value_sec value;
+    if (ble_store_read_our_sec(&key, &value) != 0 || !value.ltk_present) {
+        return 0;
+    }
+    uint32_t h = 2166136261u;
+    for (int i = 0; i < sizeof(value.ltk); i++) {
+        h = (h ^ value.ltk[i]) * 16777619u;
+    }
+    return h | 1; // never 0
 }
 
 static void print_params(dev_t* d, const char* what) {
@@ -1015,6 +1032,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         d->conn_handle = event->connect.conn_handle;
         d->connected_us = esp_timer_get_time();
         portEXIT_CRITICAL(&stats_mux);
+        d->key_tag = key_tag(&d->addr);
         print_params(d, "connected");
         {
             struct ble_gap_conn_desc desc;
@@ -1165,7 +1183,21 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             return 0;
         }
         d->encrypted = event->enc_change.status == 0;
-        EVT(d, "encryption %s status=0x%x", d->encrypted ? "on" : "failed", event->enc_change.status);
+        if (d->encrypted) {
+            uint32_t now_tag = key_tag(&d->addr);
+            const char* how = now_tag == 0              ? "no key stored"
+                              : d->key_tag == 0         ? "new pairing"
+                              : now_tag == d->key_tag   ? "stored key"
+                                                        : "new pairing, replaced the stored key";
+            EVT(d, "encryption on (%s)%s", how, peers_only ? "" : " pairing mode");
+            if (peers_only && now_tag != d->key_tag) {
+                // Nothing should pair outside pairing mode (3c46caa, b8d689d).
+                EVT(d, "WARNING: paired outside pairing mode");
+            }
+            d->key_tag = now_tag;
+        } else {
+            EVT(d, "encryption failed status=0x%x", event->enc_change.status);
+        }
         if (!d->encrypted) {
             // Usually the device still holds keys from an earlier pairing that
             // we no longer have. Keeping the link would only block a slot
