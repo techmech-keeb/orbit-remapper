@@ -174,6 +174,9 @@ static int64_t connecting_since_us; // start of either of the above
 static bool connecting_cancel_logged;
 static int64_t hold_until_us;       // no new attempt before this (RECONNECT_HOLD_MS after a disconnect)
 static int64_t fast_until_us;       // listen at the high duty cycle until then
+static int64_t wait_since_us;       // start of the current accept-list wait, over all its rounds (0: none)
+static int wait_logged_n = -1;      // device count and duty of the last "waiting for" line
+static bool wait_logged_fast;
 static struct ble_npl_callout resume_co;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
@@ -449,8 +452,16 @@ static void start_wl_wait(void) {
     wl_waiting = true;
     connecting_since_us = esp_timer_get_time();
     connecting_cancel_logged = false;
-    olog("M1 EVT t=%.3f waiting for %d bonded device(s), listening %s\n", now_s(), m,
-         fast ? "30/60 ms" : "30/300 ms");
+    if (wait_since_us == 0) {
+        wait_since_us = connecting_since_us;
+    }
+    // Rounds restart every CONNECT_TIMEOUT_MS; only say so when something changed.
+    if (m != wait_logged_n || fast != wait_logged_fast) {
+        olog("M1 EVT t=%.3f waiting for %d bonded device(s), listening %s\n", now_s(), m,
+             fast ? "30/60 ms" : "30/300 ms");
+        wait_logged_n = m;
+        wait_logged_fast = fast;
+    }
 }
 
 // Decides what the radio should do now. Called after every event; the
@@ -1016,6 +1027,13 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             }
             portEXIT_CRITICAL(&stats_mux);
             d->ctx = new_gatt_ctx(d);
+            // The controller connects on the device's first advertisement,
+            // so this is when the device showed up; the wait may span many
+            // rounds (1fd6c6a report asked for such a marker).
+            EVT(d, "connecting via accept list after %.1f s of waiting",
+                (esp_timer_get_time() - wait_since_us) / 1e6);
+            wait_since_us = 0;
+            wait_logged_n = -1;
         } else {
             connecting = false;
             d = connecting_slot();
@@ -1118,6 +1136,8 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         // upstream's BLE firmware 1 s).
         hold_until_us = esp_timer_get_time() + RECONNECT_HOLD_MS * 1000;
         fast_until_us = esp_timer_get_time() + FAST_WAIT_US;
+        wait_since_us = 0;
+        wait_logged_n = -1;
         ble_npl_callout_reset(&resume_co, ble_npl_time_ms_to_ticks32(RECONNECT_HOLD_MS));
         return 0;
 
@@ -1282,6 +1302,8 @@ static void on_sync(void) {
     scanning = false;
     hold_until_us = 0;
     fast_until_us = esp_timer_get_time() + FAST_WAIT_US;
+    wait_since_us = 0;
+    wait_logged_n = -1;
 
     int rc = ble_hs_util_ensure_addr(0);
     assert(rc == 0);
