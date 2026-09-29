@@ -740,6 +740,29 @@ static int on_report_ref(uint16_t conn_handle, const struct ble_gatt_error* erro
     return 0;
 }
 
+// The 16-bit value of a characteristic or descriptor UUID, or 0. Some
+// devices send 16-bit UUIDs as 128-bit ones with an all-zero base
+// (0000xxxx-0000-0000-0000-000000000000) instead of the Bluetooth base;
+// upstream's BLE firmware reads those as 16-bit too (patch_broken_uuids()
+// in firmware-bluetooth/src/main.cc), and so do we.
+static uint16_t uuid16_of(dev_t* d, const ble_uuid_any_t* uuid) {
+    if (uuid->u.type == BLE_UUID_TYPE_16) {
+        return uuid->u16.value;
+    }
+    if (uuid->u.type != BLE_UUID_TYPE_128) {
+        return 0;
+    }
+    const uint8_t* v = uuid->u128.value; // little-endian, the 16-bit part at 12..13
+    for (int i = 0; i < 16; i++) {
+        if (i != 12 && i != 13 && v[i] != 0) {
+            return 0;
+        }
+    }
+    uint16_t value = v[13] << 8 | v[12];
+    EVT(d, "broken 128-bit UUID read as 0x%04x", value);
+    return value;
+}
+
 static int on_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint16_t chr_val_handle,
                   const struct ble_gatt_dsc* dsc, void* arg) {
     dev_t* d = gatt_ctx_dev(arg, conn_handle);
@@ -748,9 +771,10 @@ static int on_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint
     }
     chr_t* c = &d->chrs[d->cur_chr];
     if (error->status == 0) {
-        if (ble_uuid_cmp(&dsc->uuid.u, BLE_UUID16_DECLARE(UUID_CCCD)) == 0) {
+        uint16_t uuid16 = uuid16_of(d, &dsc->uuid);
+        if (uuid16 == UUID_CCCD) {
             c->cccd_handle = dsc->handle;
-        } else if (ble_uuid_cmp(&dsc->uuid.u, BLE_UUID16_DECLARE(UUID_REPORT_REF)) == 0) {
+        } else if (uuid16 == UUID_REPORT_REF) {
             c->ref_handle = dsc->handle;
         }
         return 0;
@@ -836,7 +860,7 @@ static int on_chr(uint16_t conn_handle, const struct ble_gatt_error* error, cons
             c->val_handle = chr->val_handle;
             c->end_handle = d->svc_end[d->cur_svc];
             c->props = chr->properties;
-            c->uuid16 = chr->uuid.u.type == BLE_UUID_TYPE_16 ? ble_uuid_u16(&chr->uuid.u) : 0;
+            c->uuid16 = uuid16_of(d, &chr->uuid);
             if (c->uuid16 == UUID_REPORT_MAP && d->report_map_handle == 0) {
                 d->report_map_handle = c->val_handle;
             }
