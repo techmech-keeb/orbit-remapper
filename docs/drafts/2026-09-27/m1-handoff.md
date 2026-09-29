@@ -10,21 +10,14 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `1fd6c6a`（段階 2）の試験：許可リストの待ち受けは動いた。不合格 1（`0x3E` 2 回で 30 秒外された）と要確認 1（機器側だけ BT クリアした meteorite40 が通った）。**要確認の方は本当の穴だった**：NimBLE が「鍵が無い」と言われると、アプリに知らせずに自分でペアリングし直していた（`BLE_RESTART_PAIR`）。
-- 直した版 **`e951dbc`** の `orbit-m1-e951dbc-ble.bin`（SHA-256 `bee72521e134ead1e99c7da2b925d2638f15e803856efde3c41855fd6433e866`）を、利用者が受け取っている。アドレス `0x0`（ペアリング情報と設定は残る）。`1fd6c6a` の上に 4 コミット：
-  1. NimBLE の自動の組み直しを止めた（`b8d689d`）。「鍵が無い」は `ble.c` に届き、通常時は `device lost the bond; press Pair new device to pair it again, dropping the link` で切る。2 回続けば 30 秒外す。
-  2. 暗号化の行が `encryption on (stored key)`、`encryption on (new pairing)`、`encryption on (new pairing, replaced the stored key)` のどれかになる。ペアリングモードなら末尾に ` pairing mode`。ペアリングモード外で鍵が変わったら `WARNING: paired outside pairing mode`（出たら不具合）。
-  3. `0x3E`（`connect failed before the connect event`）は失敗の回数に数えない。すぐやり直す。
-  4. `waiting for N bonded device(s), listening ...` は、台数か聞き取りの頻度が変わったときだけ出る（10 秒ごとの待ち直しは出ない）。接続したとき `connecting via accept list after N s of waiting` が出る（機器の最初の広告でつながるので、機器が現れた時刻の目印になる。電源を入れた瞬間は本体からは見えない）。
-- やること：
-  1. 書き込み後 RST。2 台がそろうまでの時間。暗号化の行が 2 台とも `(stored key)` であること。
-  2. **M5Dial の RST を 5 回**。2 台そろうまでの時間。`0x3E` が出ても 30 秒外されず、すぐつながり直すこと。
-  3. **機器側だけ BT クリア**（M5Dial のペアリング情報は残す。meteorite40 で）：`device lost the bond; press Pair new device ...` で切られ、2 回目で 30 秒外され、**`encryption on` にならないこと**。`WARNING` が出ないこと。そのあと Pair new device で `encryption on (new pairing, replaced the stored key) pairing mode` になって使えること。
-  4. 機器の電源の入れ直し：`connecting via accept list after N s` の行と、そこから `subscribed` までの時間。
-  5. もう片方の機器（MD600）は 3 の間ずっと使えること。
-  6. A5（BIOS）は保留のまま（利用者の判断）。
-- 合格の基準：2 で 5 回とも 10 秒以内（`d2c4295` と同等）、3 で通常時に組み直されない、`WARNING` が 0 回、止まる不具合 0 回。
-- 分かっていること：9 月 28 日以降の試験はすべて USB ハブ経由で、ハブ経由の問題は `1fd6c6a` で再現しなかった。PC の休止状態や再起動で M5Dial が再起動するのは、USB の電源が切れるためで M5Dial 側の問題ではない。古い MD600 のペアリング情報が残る件は M2 で扱う。
+- `e951dbc` の試験：**合格の基準をすべて満たした**（[報告](reports/m1-e951dbc-report.md)）。段階 2（[ble-connect-plan.md](../2026-09-28/ble-connect-plan.md)、許可リストでの待ち受け）は完了。PR [#13](https://github.com/techmech-keeb/orbit-remapper/pull/13) はマージできる状態。マージは利用者が判断する。
+- いま試験することはない。次の版ができたら、この §0 を書き換える。
+- 残課題（[m1-results.md](m1-results.md) §3）：
+  - Pair new device で組み直すと、ポート番号が変わる（M2 の機器台帳で直す）。
+  - ペアリングモードで鍵を消した直後の 1 回目が 5 秒待つ（次の作業でログを足して確かめる）。
+  - 古い MD600 のペアリング情報が残る（M2）。上限は 4 件。
+  - A5（BIOS）は保留。
+- 分かっていること：9 月 28 日以降の試験はすべて USB ハブ経由で、ハブ経由の問題は `1fd6c6a` 以降再現していない。PC の休止状態や再起動で M5Dial が再起動するのは、USB の電源が切れるため。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ## 1. 結論（2026-09-27 時点）
