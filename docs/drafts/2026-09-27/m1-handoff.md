@@ -10,14 +10,18 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `e951dbc` の試験：**合格の基準をすべて満たした**（[報告](reports/m1-e951dbc-report.md)）。段階 2（[ble-connect-plan.md](../2026-09-28/ble-connect-plan.md)、許可リストでの待ち受け）は完了。PR [#13](https://github.com/techmech-keeb/orbit-remapper/pull/13) はマージできる状態。マージは利用者が判断する。
-- いま試験することはない。次の版ができたら、この §0 を書き換える。
-- 残課題（[m1-results.md](m1-results.md) §3）：
-  - Pair new device で組み直すと、ポート番号が変わる（M2 の機器台帳で直す）。
-  - ペアリングモードで鍵を消した直後の 1 回目が 5 秒待つ（次の作業でログを足して確かめる）。
-  - 古い MD600 のペアリング情報が残る（M2）。上限は 4 件。
-  - A5（BIOS）は保留。
-- 分かっていること：9 月 28 日以降の試験はすべて USB ハブ経由で、ハブ経由の問題は `1fd6c6a` 以降再現していない。PC の休止状態や再起動で M5Dial が再起動するのは、USB の電源が切れるため。
+- `a0d8f9e`（壊れた UUID の補正）の試験：回帰なし。IST Trackball は使えた。**Cube Turner PRO は使えなかった**（A1：機器が自分からペアリングを始めたのに、予約したやり直しで暗号化をもう一度始めて切れる）。ほかに A2（IST の鍵の指紋が読めない）、A3（暗号化に失敗する機器が先だと 5 秒待たされる）、A4（ペアリングモードでも古い鍵から抜け出せない）。
+- 直した版 **`a4c1b49`** の `orbit-m1-a4c1b49-ble.bin`（SHA-256 `90bcecdc45dcb87ebd1332bad0030bbcb76914ef55f1e6a26087c898269f07d2`）を、利用者が受け取っている。アドレス `0x0`（ペアリング情報と設定は残る）。PR は [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16)（UUID の補正と同じ PR に載せた）。3 コミット：
+  1. `6e6a1e3`（A2）：鍵の指紋は機器が配った鍵（peer）を先に読む。IST でも `(stored key)` / `(new pairing)` が出るはず。
+  2. `89aff6a`（A3）：電波を止めるのは探索中だけ。暗号化中は次の機器を待つ。
+  3. `a4c1b49`（A1・A4）：機器が自分からペアリングを始めたら（`device started pairing itself`）やり直しを予約しない。暗号化の結果が出たら予約を必ず消す。**ペアリングモードでは**、保存した鍵が失敗したら（`stored key failed status=..., pairing again (pairing mode)`）、または 5 秒答えがなければ（`no encryption after 5 s, forgetting the stored key (pairing mode)`）、その機器の鍵を消してペアリングし直す。通常時の扱いは変えていない。
+- やること（機器は IST Trackball と Cube Turner PRO）：
+  1. 書き込み後 RST。IST が `(stored key)` でつながること（`(no key stored)` が出ないこと）。
+  2. **Cube Turner PRO**：Pair new device → `device started pairing itself` → `encryption on (new pairing) pairing mode` → `subscribed` → ペダルが PC で効くこと。切れないこと。その後 RST して `(stored key)` でつながり直すこと。
+  3. **A4**：Cube Turner の電源を切り、Pair new device を押した状態で電源を入れ直す（機器が古い鍵を持ったまま、または捨てた状態を作る）。`stored key failed ... pairing again` か `forgetting the stored key` のどちらかで抜けて、Forget all devices なしで使えるようになること。
+  4. **A3**：2 台のうち片方の鍵を機器側で消した状態で RST。もう片方が 5 秒待たされずにつながること（時間を記録）。
+  5. `WARNING` 0 回、止まる不具合 0 回。
+- 合格の基準：2 で Cube Turner が使え、3 で Forget all devices なしに戻れ、4 で待ち時間が縮む。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ## 1. 結論（2026-09-27 時点）
