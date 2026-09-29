@@ -151,3 +151,17 @@ ESP-IDF の issue（2026-09-28 時点の状態）：
 
 - Logitech, Logi Bolt white paper: https://www.logitech.com/content/dam/logitech/en/business/pdf/logi-bolt-white-paper.pdf
 - Keychron, Wireless mouse and keyboard not working: https://www.keychron.com/blogs/news/keychron-wireless-mouse-and-keyboard-not-working
+
+## BLE アドレスの一意性（2026-09-29 確認）
+
+Q37 の根拠。いずれも最終確認日 2026-09-29。
+
+- Bluetooth Core 5.4 Vol 2 Part B §1.2（Bluetooth Device Address、EUI-48）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/br-edr-controller/baseband-specification.html
+- Bluetooth Core 5.4 Vol 6 Part B §1.3（Device Address：public、random static、RPA、身元アドレス）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/low-energy-controller/link-layer-specification.html
+- Bluetooth Core 5.4 Vol 3 Part C §10.7（Privacy、身元の一意性）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/host/generic-access-profile.html
+- IEEE RA, Guidelines for Use of EUI, OUI, and CID（2017-08-03）: https://standards.ieee.org/wp-content/uploads/import/documents/tutorials/eui.pdf
+- Bluetooth SIG, Device Information Service 1.2（2023-06-21）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/DIS_v1.2/out/en/index-en.html
+- Khadas フォーラム, Duplicate Bluetooth MAC addresses（2023-12）: https://forum.khadas.com/t/duplicate-bluetooth-mac-addresses/20923
+- dotintent/react-native-ble-plx #373（同一 MAC の 2 台、2018-11）: https://github.com/dotintent/react-native-ble-plx/issues/373
+- Nordic DevZone（DEVICEADDR の一意性）: https://devzone.nordicsemi.com/f/nordic-q-a/7512
+- ESP-IDF Misc System API（base MAC の派生）: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/misc_system_api.html
