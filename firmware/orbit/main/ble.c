@@ -63,9 +63,12 @@
 
 // A device whose encryption failed (it still holds keys from an earlier
 // pairing) reconnects at once and fails again: 280 attempts in 2 minutes,
-// crowding out other devices (09b3075 report). After MAX_FAILS failures in
-// a row it is left out of the accept list for AVOID_US (nRF Desktop allows
-// two attempts per device before filtering it).
+// crowding out other devices (09b3075 report). After MAX_FAILS such
+// failures in a row it is left out of the accept list for AVOID_US (nRF
+// Desktop allows two attempts per device before filtering it). Only
+// failures that a reconnect cannot fix count (give_up_on()); a link that
+// dies while being set up (0x3E) is retried at once, as before stage 2
+// (1fd6c6a report: two 0x3E in a row kept meteorite40 out for 38 s).
 #define MAX_FAILS 2
 #define AVOID_US (30 * 1000000)
 #define AVOID_MAX 4
@@ -1075,10 +1078,8 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
                 // NimBLE has already left the connect procedure, so the
                 // wait is over; start the next round.
                 wl_waiting = false;
-                bool excluded = fail_note(peer);
-                olog("M1 EVT t=%.3f addr=..:%02x:%02x connect failed before the connect event reason=0x%x hci=0x%02x%s\n",
-                     now_s(), peer->val[1], peer->val[0], event->disconnect.reason, hci(event->disconnect.reason),
-                     excluded ? ", ignoring the device for 30 s" : "");
+                olog("M1 EVT t=%.3f addr=..:%02x:%02x connect failed before the connect event reason=0x%x hci=0x%02x\n",
+                     now_s(), peer->val[1], peer->val[0], event->disconnect.reason, hci(event->disconnect.reason));
                 schedule();
                 return 0;
             }
@@ -1088,11 +1089,8 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
                      event->disconnect.conn.conn_handle, event->disconnect.reason);
                 return 0;
             }
-            {
-                bool excluded = fail_note(&d->addr);
-                EVT(d, "connect failed before the connect event reason=0x%x hci=0x%02x%s", event->disconnect.reason,
-                    hci(event->disconnect.reason), excluded ? ", ignoring the device for 30 s" : "");
-            }
+            EVT(d, "connect failed before the connect event reason=0x%x hci=0x%02x", event->disconnect.reason,
+                hci(event->disconnect.reason));
             set_last_event("CONNFAIL", (int) (d - devs), hci(event->disconnect.reason));
             connecting = false;
             portENTER_CRITICAL(&stats_mux);
