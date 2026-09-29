@@ -470,9 +470,8 @@ static void start_wl_wait(void) {
 
 // Decides what the radio should do now. Called after every event; the
 // controller runs at most one of: waiting on the accept list, scanning,
-// connecting. Nothing new starts while a link is still being set up
-// (encrypting or discovering), as nRF Desktop does: encryption and
-// discovery are one-at-a-time procedures anyway.
+// connecting. Nothing new starts while a link is being discovered, as
+// nRF Desktop does.
 static void schedule(void) {
     if (connecting || wl_waiting || scanning || free_slot() == NULL) {
         return;
@@ -480,9 +479,13 @@ static void schedule(void) {
     if (esp_timer_get_time() < hold_until_us) {
         return; // resume_co fires schedule() when the hold ends
     }
+    // Only discovery holds the radio. Holding during encryption too made a
+    // device whose key fails block the other device for the 5 s ENC_WAIT_US
+    // (a0d8f9e report); the one-at-a-time SM limit is handled by the
+    // sec_pending retry instead.
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
-        if (d->connected && (!d->encrypted || (d->discovering && !d->discovery_finished))) {
+        if (d->connected && d->discovering && !d->discovery_finished) {
             return;
         }
     }
@@ -1102,7 +1105,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             EVT(d, "security start failed rc=0x%x, retrying", rc);
             d->sec_pending = true;
         }
-        schedule(); // holds until this link is encrypted and discovered
+        schedule(); // holds while this link is being discovered
         return 0;
     }
 
