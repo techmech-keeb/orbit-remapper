@@ -247,6 +247,7 @@ static int gap_event(struct ble_gap_event* event, void* arg);
 static void discover_next_report(dev_t* d);
 static void start_discovery(dev_t* d);
 static void schedule(void);
+static bool is_bonded(const ble_addr_t* addr);
 
 static double now_s(void) {
     return esp_timer_get_time() / 1e6;
@@ -555,6 +556,12 @@ static void periodic_check(struct ble_npl_event* ev) {
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
         if (d->connected && !d->encrypted && now - d->connected_us > ENC_WAIT_US) {
+            if (!peers_only && is_bonded(&d->addr)) {
+                // Pairing mode: the stored key got no answer at all. Forget
+                // it so that the reconnect pairs afresh (a0d8f9e report).
+                EVT(d, "no encryption after 5 s, forgetting the stored key (pairing mode)");
+                ble_store_util_delete_peer(&d->addr);
+            }
             give_up_on(d, "no encryption after 5 s", 0);
         }
     }
@@ -1097,7 +1104,12 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         // HOGP devices may not send reports until the link is encrypted
         // (prior-art.md §4.29), so start it ourselves.
         int rc = ble_gap_security_initiate(d->conn_handle);
-        if (rc != 0) {
+        if (rc == BLE_HS_EALREADY) {
+            // The device started pairing on its own; ours is not needed.
+            // Retrying after its pairing succeeds re-encrypts an encrypted
+            // link and the device drops it (a0d8f9e report, Cube Turner PRO).
+            EVT(d, "device started pairing itself");
+        } else if (rc != 0) {
             // NimBLE runs one pairing/encryption procedure at a time
             // (BLE_SM_MAX_PROCS = 1), so this fails with rc=0x6 while the
             // other device is pairing (0a0cfcf report). Not the device's
@@ -1216,19 +1228,28 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         if (d == NULL) {
             return 0;
         }
-        if (event->enc_change.status == BLE_HS_HCI_ERR(BLE_ERR_PINKEY_MISSING) && !d->repaired) {
-            // The device says it has no key for us (it was re-paired elsewhere
-            // or reset). Replacing our bond is a new pairing, so only in
+        d->sec_pending = false; // decided either way; never start it again on this link
+        if (event->enc_change.status != 0 && !peers_only && !d->repaired) {
+            // Pairing mode, and the stored key did not work: the device says
+            // it has none (it was re-paired elsewhere or reset), or it did
+            // not answer. Replacing our bond is a new pairing, so only in
             // pairing mode; otherwise anything claiming a bonded address
-            // could pair itself in.
-            if (peers_only) {
-                give_up_on(d, "device lost the bond; press Pair new device to pair it again", 0);
-                return 0;
-            }
-            EVT(d, "device lost the bond, pairing again (pairing mode)");
+            // could pair itself in. (a0d8f9e report: a stale key that the
+            // device ignored used to leave Forget all devices as the only
+            // way out.)
+            EVT(d, "stored key failed status=0x%x, pairing again (pairing mode)", event->enc_change.status);
             d->repaired = true;
             ble_store_util_delete_peer(&d->addr);
-            ble_gap_security_initiate(d->conn_handle);
+            int rc = ble_gap_security_initiate(d->conn_handle);
+            if (rc != 0) {
+                // Drop the link; the key is gone, so the reconnect pairs afresh.
+                EVT(d, "pairing start failed rc=0x%x, reconnecting", rc);
+                ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            }
+            return 0;
+        }
+        if (event->enc_change.status == BLE_HS_HCI_ERR(BLE_ERR_PINKEY_MISSING) && peers_only) {
+            give_up_on(d, "device lost the bond; press Pair new device to pair it again", 0);
             return 0;
         }
         d->encrypted = event->enc_change.status == 0;
