@@ -14,17 +14,13 @@ static double now_s(void) {
 }
 
 #define NS  "orbit"
-#define KEY "ledger"
+#define KEY "ledger"     // the rows array as it is (session-only flags masked on load)
+#define KEY_VERSION "ledger_v"
 #define KEY_BOOTS "boots"
-#define LEDGER_VERSION 1
+#define LEDGER_VERSION 2
 
-// What goes to NVS: the rows without their session-only flags.
-typedef struct {
-    uint8_t version;
-    uint8_t n;
-    orbit_ledger_row_t rows[ORBIT_LEDGER_MAX];
-} persisted_t;
-
+// Written to NVS as one blob, straight from this array: a staging copy
+// would cost another 2.3 KB of RAM (102144d report: heap_min 9 KB below M1).
 static orbit_ledger_row_t rows[ORBIT_LEDGER_MAX];
 static uint32_t boots;
 static SemaphoreHandle_t mutex;
@@ -39,20 +35,13 @@ static void unlock(void) {
 
 // Called with the lock held.
 static void save(void) {
-    static persisted_t p; // 2.3 KB; not on the stack
-    p.version = LEDGER_VERSION;
-    p.n = 0;
-    for (int i = 0; i < ORBIT_LEDGER_MAX; i++) {
-        if (rows[i].port != 0) {
-            p.rows[p.n] = rows[i];
-            p.rows[p.n].flags &= ~ORBIT_LEDGER_NEW;
-            p.n++;
-        }
-    }
     nvs_handle_t h;
     esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
     if (err == ESP_OK) {
-        err = nvs_set_blob(h, KEY, &p, sizeof(p));
+        err = nvs_set_u8(h, KEY_VERSION, LEDGER_VERSION);
+        if (err == ESP_OK) {
+            err = nvs_set_blob(h, KEY, rows, sizeof(rows));
+        }
         if (err == ESP_OK) {
             err = nvs_commit(h);
         }
@@ -95,28 +84,32 @@ static int free_port(void) {
 
 void orbit_ledger_init(void) {
     mutex = xSemaphoreCreateMutex();
-    static persisted_t p;
     nvs_handle_t h;
     if (nvs_open(NS, NVS_READWRITE, &h) == ESP_OK) {
         nvs_get_u32(h, KEY_BOOTS, &boots);
         boots++;
         nvs_set_u32(h, KEY_BOOTS, boots);
-        size_t len = sizeof(p);
-        esp_err_t err = nvs_get_blob(h, KEY, &p, &len);
+        uint8_t version = 0;
+        nvs_get_u8(h, KEY_VERSION, &version);
+        size_t len = sizeof(rows);
+        esp_err_t err = version == LEDGER_VERSION ? nvs_get_blob(h, KEY, rows, &len) : ESP_ERR_NVS_NOT_FOUND;
         nvs_commit(h);
         nvs_close(h);
-        if (err == ESP_OK && len == sizeof(p) && p.version == LEDGER_VERSION) {
-            int n = 0;
-            for (int i = 0; i < p.n && i < ORBIT_LEDGER_MAX; i++) {
-                if (p.rows[i].port >= 1 && p.rows[i].port <= ORBIT_LEDGER_MAX) {
-                    rows[n] = p.rows[i];
-                    rows[n].flags &= ~ORBIT_LEDGER_NEW;
-                    n++;
+        if (err == ESP_OK && len == sizeof(rows)) {
+            for (int i = 0; i < ORBIT_LEDGER_MAX; i++) {
+                if (rows[i].port < 1 || rows[i].port > ORBIT_LEDGER_MAX) {
+                    memset(&rows[i], 0, sizeof(rows[i]));
                 }
+                rows[i].flags &= ~ORBIT_LEDGER_NEW;
             }
-        } else if (err != ESP_ERR_NVS_NOT_FOUND) {
-            olog("M1 EVT t=%.3f ledger load failed err=0x%x len=%u version=%u, starting empty\n", now_s(), err,
-                 (unsigned) len, p.version);
+        } else {
+            memset(rows, 0, sizeof(rows));
+            if (err != ESP_ERR_NVS_NOT_FOUND) {
+                olog("M1 EVT t=%.3f ledger load failed err=0x%x len=%u, starting empty\n", now_s(), err, (unsigned) len);
+            } else if (version != 0 && version != LEDGER_VERSION) {
+                olog("M1 EVT t=%.3f ledger version %u is not %u, starting empty (rows come back from the bonds)\n",
+                     now_s(), version, LEDGER_VERSION);
+            }
         }
     }
     olog("M1 EVT t=%.3f ledger loaded boot=%lu rows=%d\n", now_s(), (unsigned long) boots, orbit_ledger_count());
