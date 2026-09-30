@@ -343,6 +343,7 @@ extern "C" void app_main() {
     print_start();
     olog("M1 EVT t=%.3f config loaded from NVS err=0x%x%s\n", orbit_now_s(), cfg_err,
          cfg_err == ESP_OK ? "" : " (using defaults)");
+    orbit_storage_log_usage();
 
     xTaskCreatePinnedToCore(main_loop, "main_loop", 8192, NULL, 10, &main_task, 1);
     orbit_ble_start(main_task);
