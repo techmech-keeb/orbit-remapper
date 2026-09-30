@@ -14,6 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "host/ble_hs.h"
+#include "host/ble_hs_hci.h"
 #include "host/util/util.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
@@ -1476,6 +1477,17 @@ static void on_sync(void) {
     assert(rc == 0);
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
     assert(rc == 0);
+    // NimBLE issues LE Set Data Length (251 bytes, 2120 us) on every link
+    // right after it posts the connect event (ble_gap_event_connect_call).
+    // On the ESP32-S3 a data-length update issued while a bonded
+    // reconnection's encryption is in flight can break that encryption
+    // (esp-idf#19057), and our lost ENC_CHANGE events all came from links
+    // where encryption straddled the connect event. Make the controller's
+    // default the same values, so that per-link request changes nothing.
+    rc = ble_hs_hci_util_write_sugg_def_data_len(BLE_HCI_SUGG_DEF_DATALEN_TX_OCTETS_MAX,
+                                                 BLE_HCI_SUGG_DEF_DATALEN_TX_TIME_MAX);
+    olog("M1 EVT t=%.3f default data length set rc=0x%x\n", now_s(), rc);
+
     ble_addr_t peers[CONFIG_BT_NIMBLE_MAX_BONDS];
     int n = 0;
     ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
