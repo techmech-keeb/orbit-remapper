@@ -355,6 +355,34 @@ static uint32_t key_tag(const ble_addr_t* addr) {
     return h | 1; // never 0
 }
 
+// What we hold for this device and what the link says about its security
+// (requirement G: the Cube Turner PRO never answers encryption with the
+// stored key, so show whether the pairing was bonded, Secure Connections
+// or legacy, and which keys each side distributed). Key values are never
+// printed.
+static void log_security(dev_t* d, const char* when) {
+    struct ble_gap_conn_desc desc;
+    if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
+        EVT(d, "%s: link enc=%u auth=%u bonded=%u key_size=%u", when, desc.sec_state.encrypted,
+            desc.sec_state.authenticated, desc.sec_state.bonded, desc.sec_state.key_size);
+    }
+    struct ble_store_key_sec key = { .peer_addr = d->addr, .idx = 0 };
+    struct ble_store_value_sec v;
+    if (ble_store_read_peer_sec(&key, &v) == 0) {
+        EVT(d, "%s: stored peer keys ltk=%u irk=%u csrk=%u sc=%u auth=%u key_size=%u ediv_rand=%s", when,
+            v.ltk_present, v.irk_present, v.csrk_present, v.sc, v.authenticated, v.key_size,
+            (v.ediv != 0 || v.rand_num != 0) ? "set" : "zero");
+    } else {
+        EVT(d, "%s: no stored peer keys", when);
+    }
+    if (ble_store_read_our_sec(&key, &v) == 0) {
+        EVT(d, "%s: stored our keys ltk=%u irk=%u csrk=%u sc=%u auth=%u key_size=%u", when, v.ltk_present,
+            v.irk_present, v.csrk_present, v.sc, v.authenticated, v.key_size);
+    } else {
+        EVT(d, "%s: no stored our keys", when);
+    }
+}
+
 static void print_params(dev_t* d, const char* what) {
     struct ble_gap_conn_desc desc;
     if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
@@ -556,6 +584,7 @@ static void periodic_check(struct ble_npl_event* ev) {
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
         if (d->connected && !d->encrypted && now - d->connected_us > ENC_WAIT_US) {
+            log_security(d, "no answer");
             if (!peers_only && is_bonded(&d->addr)) {
                 // Pairing mode: the stored key got no answer at all. Forget
                 // it so that the reconnect pairs afresh (a0d8f9e report).
@@ -1223,6 +1252,14 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         return on_update_request(d, event->type == BLE_GAP_EVENT_CONN_UPDATE_REQ ? "LL update req" : "L2CAP update req",
                                  event->conn_update_req.peer_params);
 
+    case BLE_GAP_EVENT_PARING_COMPLETE:
+        d = dev_by_handle(event->pairing_complete.conn_handle);
+        if (d != NULL) {
+            EVT(d, "pairing complete status=0x%x", event->pairing_complete.status);
+            log_security(d, "after pairing");
+        }
+        return 0;
+
     case BLE_GAP_EVENT_ENC_CHANGE:
         d = dev_by_handle(event->enc_change.conn_handle);
         if (d == NULL) {
@@ -1267,6 +1304,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             d->key_tag = now_tag;
         } else {
             EVT(d, "encryption failed status=0x%x", event->enc_change.status);
+            log_security(d, "at failure");
         }
         if (!d->encrypted) {
             // Usually the device still holds keys from an earlier pairing that
