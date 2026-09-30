@@ -10,9 +10,17 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `66521d2` の試験（[報告](reports/m1-66521d2-report.md)）：合格。接続の処理に回帰なし、保存領域と機器の情報のログは 2 台とも取れた。**PR [#22](https://github.com/techmech-keeb/orbit-remapper/pull/22) はマージできる状態。** マージは利用者が判断する。
-- 報告で確かめてほしいとあった「広告の名前が空」：`ble.c` の作りから見て、最初の広告（ADV_IND）で探索を止めてつなぎに行くため、スキャン応答（SCAN_RSP）に載る名前は届く前に捨てられる。接続後に読む `info name=` で足りるので探索は変えない（M2 の台帳もこちらを使う）。
-- いま試験することはない（MD600・meteorite40 の回帰確認を行う場合を除く）。次の版ができたら、この §0 を書き換える。
+- PR [#22](https://github.com/techmech-keeb/orbit-remapper/pull/22) はマージ済み（`fe214d0`）。
+- 新しい版 **`2cb6aad`**（`orbit-m1-2cb6aad-ble.bin`。名前と SHA-256 は利用者が貼る）。要件 G-5：**画面（ダイヤルの中央）を 2 秒押し込むと Pair new device と同じ状態**に入る（画面 3 行目が黄色の `PAIRING`、ログ `button held 2000 ms: pair new device` → `pair_new_device` → `scan start (pairing)`）。もう一度 2 秒押し込むとやめる（`button held 2000 ms: stop pairing` → `stop_pairing bonds=N` → `waiting for ...`）。登録済みが 1 台も無いときはやめない（`stop_pairing: nothing bonded, staying in pairing mode`）。1 回の押し込みで動くのは 1 回だけ（押し続けても繰り返さない）。接続の処理は `66521d2` と同じ。
+- **注意**：押し込んだまま RST を押すと、これまでどおり書き込みモードに入る（起動時の判定が先）。ペアリング待ちに入れるのは、起動した後の押し込み。
+- **試験（短い）**：
+  1. 書き込み → 2 台が `(stored key)` でつながることを確かめる。
+  2. 2 台つながった状態で画面を 2 秒押し込む → `PAIRING 2/2` になり、ログに `pair_new_device` が出ること。空きが無いので探索は始まらない（`scan start` は出ない）はず。**出たかどうかを報告**。
+  3. もう一度 2 秒押し込む → `stop_pairing bonds=2` が出て `WAIT`（または `IDLE`）に戻ること。
+  4. Cube Turner の電源を切る → 2 秒押し込む（`PAIRING 1/2`、`scan start (pairing)`）→ Cube Turner の電源を入れる → 保存した鍵でつながり、`PAIRING` が消えること（`pairing mode, found by polling` か `(stored key) pairing mode`）。
+  5. 押し込み 1 秒で離す → 何も起きないこと（ログに `button held` が出ない）。
+  6. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内（押し込みの監視が主ループに入ったので回帰確認）。
+- **見てほしいこと**：押し込みの間に `LAT` が増えないか。画面の押し込みが硬くて 2 秒保てないなら、その旨（時間を変える）。
 - 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
