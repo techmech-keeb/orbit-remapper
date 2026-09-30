@@ -11,10 +11,11 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
 - `a0d8f9e`（壊れた UUID の補正）の試験：回帰なし。IST Trackball は使えた。**Cube Turner PRO は使えなかった**（A1：機器が自分からペアリングを始めたのに、予約したやり直しで暗号化をもう一度始めて切れる）。ほかに A2（IST の鍵の指紋が読めない）、A3（暗号化に失敗する機器が先だと 5 秒待たされる）、A4（ペアリングモードでも古い鍵から抜け出せない）。
-- 直した版 **`a4c1b49`** の `orbit-m1-a4c1b49-ble.bin`（SHA-256 `90bcecdc45dcb87ebd1332bad0030bbcb76914ef55f1e6a26087c898269f07d2`）を、利用者が受け取っている。アドレス `0x0`（ペアリング情報と設定は残る）。PR は [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16)（UUID の補正と同じ PR に載せた）。3 コミット：
+- 直した版 **`a4c1b49`** の上に鍵の種類のログを足した **`ff8e166`** の `orbit-m1-ff8e166-ble.bin`（SHA-256 `d5b55f7029f2751cf9afd983fd7bd6306f4e96a8a9c7bb34ef8f28e8829e6eb1`）を、利用者が受け取っている（`a4c1b49` の `.bin` も渡してあるが、`ff8e166` で試すこと）。アドレス `0x0`（ペアリング情報と設定は残る）。PR は [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16)（UUID の補正と同じ PR に載せた）。3 コミット：
   1. `6e6a1e3`（A2）：鍵の指紋は機器が配った鍵（peer）を先に読む。IST でも `(stored key)` / `(new pairing)` が出るはず。
   2. `89aff6a`（A3）：電波を止めるのは探索中だけ。暗号化中は次の機器を待つ。
   3. `a4c1b49`（A1・A4）：機器が自分からペアリングを始めたら（`device started pairing itself`）やり直しを予約しない。暗号化の結果が出たら予約を必ず消す。**ペアリングモードでは**、保存した鍵が失敗したら（`stored key failed status=..., pairing again (pairing mode)`）、または 5 秒答えがなければ（`no encryption after 5 s, forgetting the stored key (pairing mode)`）、その機器の鍵を消してペアリングし直す。通常時の扱いは変えていない。
+- `ff8e166` で足したログ（要件 G-0）：`pairing complete status=...` の後に `after pairing: link enc= auth= bonded= key_size=`、`stored peer keys ltk= irk= csrk= sc= auth= key_size= ediv_rand=`、`stored our keys ...` の 3 行。暗号化に失敗したときは `at failure: ...`、5 秒答えがないときは `no answer: ...` で同じ 3 行。鍵の値は出ない。**Cube Turner PRO の 3 行を、ペアリング直後と、RST 後に答えないときの両方で報告してほしい**（`bonded`、`sc`、`ediv_rand` が特に重要）。
 - やること（機器は IST Trackball と Cube Turner PRO）：
   1. 書き込み後 RST。IST が `(stored key)` でつながること（`(no key stored)` が出ないこと）。
   2. **Cube Turner PRO**：Pair new device → `device started pairing itself` → `encryption on (new pairing) pairing mode` → `subscribed` → ペダルが PC で効くこと。切れないこと。その後 RST して `(stored key)` でつながり直すこと。
