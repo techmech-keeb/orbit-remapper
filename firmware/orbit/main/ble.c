@@ -625,12 +625,17 @@ static void periodic_check(struct ble_npl_event* ev) {
     // an unencrypted link is of no use anyway.
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
-        // NimBLE does not always post ENC_CHANGE: when the device's own
-        // Security Request and our request overlap, the link ends up
-        // encrypted (the controller only encrypts with the key we hold for
-        // that address) and no event reaches us (9309d56 report: four
-        // links dropped for "no answer" with enc=1). So look at the link
-        // ourselves once a second while waiting.
+        // NimBLE does not always post ENC_CHANGE. When the controller's
+        // Encryption Change event arrives and the security manager holds no
+        // procedure for the link, ble_sm_enc_event_rx() records the link
+        // as encrypted (bonded and key_size stay 0) but
+        // ble_sm_process_result() leaves its loop before posting any event
+        // (the "if (proc == NULL) break;" in ble_sm.c). That is what the
+        // Cube Turner PRO hits when its Security Request straddles the
+        // connect event (9309d56 and f2093b6 reports: enc=1 bonded=0
+        // key_size=0, no event). Why its procedure is gone by then is not
+        // known; nothing is left pending in the SM either way. So look at
+        // the link ourselves once a second while waiting.
         if (d->connected && !d->encrypted && !d->sec_pending) {
             struct ble_gap_conn_desc desc;
             if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
