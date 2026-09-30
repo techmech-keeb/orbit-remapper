@@ -47,7 +47,8 @@
 // advertising (09b3075 report): the attempt hung until RST.
 #define CONNECT_STUCK_CANCEL_US (15 * 1000000)
 #define CONNECT_STUCK_RESET_US  (25 * 1000000)
-#define ENC_WAIT_US (5 * 1000000)
+#define ENC_WAIT_US (5 * 1000000)         // from our encryption request to an answer
+#define SEC_PENDING_MAX_US (15 * 1000000) // waiting for NimBLE's one SM slot to free up
 // The first GATT request on a link made right after the device dropped the
 // previous one sometimes gets no answer until the 30 s ATT timeout
 // (a195bc8 report, problem G'). A fresh link answers within 0.5 s.
@@ -111,6 +112,7 @@ struct dev {
     bool repaired; // already retried pairing after the device lost our bond
     int64_t connected_us;
     bool sec_pending; // ble_gap_security_initiate() failed, retry from periodic_check()
+    int64_t sec_started_us; // when our encryption/pairing request went out (0: not yet)
 
     bool discovering;
     bool discovery_finished;
@@ -383,6 +385,41 @@ static void log_security(dev_t* d, const char* when) {
     }
 }
 
+static void restart_discovery_if_unsubscribed(dev_t* d);
+
+// The link is encrypted: say with which key, guard against pairing outside
+// pairing mode, and go on to discovery. Reached from the ENC_CHANGE event,
+// or from the connect event when the device encrypted the link on its own
+// before NimBLE posted the connect event (ff8e166 report, Cube Turner PRO:
+// its Security Request right after connecting made NimBLE restore the
+// stored key and post ENC_CHANGE while we did not know the link yet, so
+// the event was lost; our own encryption request on the already-encrypted
+// link then hung until we dropped it).
+static void on_encrypted(dev_t* d, const char* when) {
+    d->encrypted = true;
+    uint32_t now_tag = key_tag(&d->addr);
+    const char* how = now_tag == 0              ? "no key stored"
+                      : d->key_tag == 0         ? "new pairing"
+                      : now_tag == d->key_tag   ? "stored key"
+                                                : "new pairing, replaced the stored key";
+    EVT(d, "encryption on (%s)%s%s", how, peers_only ? "" : " pairing mode", when);
+    if (peers_only && now_tag != d->key_tag) {
+        // Nothing should pair outside pairing mode (3c46caa, b8d689d).
+        EVT(d, "WARNING: paired outside pairing mode");
+    }
+    d->key_tag = now_tag;
+    peers_only = true; // as upstream: back to bonded devices only after a successful pairing
+    if (d->discovering) {
+        // Subscribing before encryption may have failed; retry once it is up.
+        if (d->discovery_finished) {
+            restart_discovery_if_unsubscribed(d);
+        } else {
+            d->rediscover = true;
+        }
+    }
+    start_discovery(d);
+}
+
 static void print_params(dev_t* d, const char* what) {
     struct ble_gap_conn_desc desc;
     if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
@@ -550,9 +587,14 @@ static void periodic_check(struct ble_npl_event* ev) {
         dev_t* d = &devs[i];
         if (d->connected && d->sec_pending) {
             int rc = ble_gap_security_initiate(d->conn_handle);
-            if (rc == 0) {
+            if (rc == 0 || rc == BLE_HS_EALREADY) {
                 d->sec_pending = false;
+                d->sec_started_us = now;
                 EVT(d, "security started");
+            } else if (now - d->connected_us > SEC_PENDING_MAX_US) {
+                // The other device's procedure never finished; do not hold
+                // this slot forever.
+                give_up_on(d, "could not start encryption for 15 s", rc);
             }
         }
     }
@@ -583,7 +625,11 @@ static void periodic_check(struct ble_npl_event* ev) {
     // an unencrypted link is of no use anyway.
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
-        if (d->connected && !d->encrypted && now - d->connected_us > ENC_WAIT_US) {
+        // Counted from our own request, not from the connect event: while
+        // another device's procedure keeps NimBLE busy (rc=0x6) this device
+        // has not been asked anything yet (ff8e166 report, problem 2).
+        if (d->connected && !d->encrypted && !d->sec_pending && d->sec_started_us != 0 &&
+            now - d->sec_started_us > ENC_WAIT_US) {
             log_security(d, "no answer");
             if (!peers_only && is_bonded(&d->addr)) {
                 // Pairing mode: the stored key got no answer at all. Forget
@@ -1131,7 +1177,15 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         }
         set_last_event("CONN", (int) (d - devs), -1);
         // HOGP devices may not send reports until the link is encrypted
-        // (prior-art.md §4.29), so start it ourselves.
+        // (prior-art.md §4.29), so start it ourselves, unless the device
+        // already did (see on_encrypted()).
+        struct ble_gap_conn_desc sec;
+        if (ble_gap_conn_find(d->conn_handle, &sec) == 0 && sec.sec_state.encrypted) {
+            on_encrypted(d, ", before the connect event");
+            schedule();
+            return 0;
+        }
+        d->sec_started_us = esp_timer_get_time();
         int rc = ble_gap_security_initiate(d->conn_handle);
         if (rc == BLE_HS_EALREADY) {
             // The device started pairing on its own; ours is not needed.
@@ -1255,8 +1309,9 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
     case BLE_GAP_EVENT_PARING_COMPLETE:
         d = dev_by_handle(event->pairing_complete.conn_handle);
         if (d != NULL) {
-            EVT(d, "pairing complete status=0x%x", event->pairing_complete.status);
-            log_security(d, "after pairing");
+            // Posted for a stored-key encryption too, not only for a pairing.
+            EVT(d, "security done status=0x%x", event->pairing_complete.status);
+            log_security(d, "after security");
         }
         return 0;
 
@@ -1289,42 +1344,20 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             give_up_on(d, "device lost the bond; press Pair new device to pair it again", 0);
             return 0;
         }
-        d->encrypted = event->enc_change.status == 0;
-        if (d->encrypted) {
-            uint32_t now_tag = key_tag(&d->addr);
-            const char* how = now_tag == 0              ? "no key stored"
-                              : d->key_tag == 0         ? "new pairing"
-                              : now_tag == d->key_tag   ? "stored key"
-                                                        : "new pairing, replaced the stored key";
-            EVT(d, "encryption on (%s)%s", how, peers_only ? "" : " pairing mode");
-            if (peers_only && now_tag != d->key_tag) {
-                // Nothing should pair outside pairing mode (3c46caa, b8d689d).
-                EVT(d, "WARNING: paired outside pairing mode");
-            }
-            d->key_tag = now_tag;
-        } else {
+        if (event->enc_change.status != 0) {
             EVT(d, "encryption failed status=0x%x", event->enc_change.status);
             log_security(d, "at failure");
-        }
-        if (!d->encrypted) {
             // Usually the device still holds keys from an earlier pairing that
             // we no longer have. Keeping the link would only block a slot
             // (6254d16 report); drop it, and the device can pair afresh.
             give_up_on(d, "encryption failed", hci(event->enc_change.status));
             return 0;
         }
-        {
-            peers_only = true; // as upstream: back to bonded devices only after a successful pairing
-            if (d->discovering) {
-                // Subscribing before encryption may have failed; retry once it is up.
-                if (d->discovery_finished) {
-                    restart_discovery_if_unsubscribed(d);
-                } else {
-                    d->rediscover = true;
-                }
-            }
+        if (d->encrypted) {
+            EVT(d, "encryption changed again (key refresh)");
+            return 0;
         }
-        start_discovery(d);
+        on_encrypted(d, "");
         return 0;
 
     case BLE_GAP_EVENT_REPEAT_PAIRING: {
