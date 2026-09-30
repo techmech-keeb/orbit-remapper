@@ -81,6 +81,7 @@ void orbit_ble_forget(int port);              // drop the device's bond, row and
 void orbit_ble_move(int new_port, int old_port); // the device on new_port takes over old_port
 bool orbit_ble_bonds_full(void);              // a pairing was refused because all 15 ports are taken
 bool orbit_ble_duplicates(void);              // two or more ledger rows look like one device; the user picks
+int orbit_ble_slot_port(int slot);            // ledger port of the device connected on slot, 0 when none
 
 // Requirement G: a bonded device asking to pair again outside pairing mode.
 typedef struct {

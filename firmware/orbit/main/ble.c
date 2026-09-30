@@ -2085,6 +2085,10 @@ void orbit_ble_approval(orbit_approval_t* out) {
     }
 }
 
+int orbit_ble_slot_port(int slot) {
+    return devs[slot].connected ? orbit_ledger_port(&devs[slot].addr) : 0;
+}
+
 bool orbit_ble_duplicates(void) {
     return duplicates_seen;
 }
