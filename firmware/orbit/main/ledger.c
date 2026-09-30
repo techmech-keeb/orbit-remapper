@@ -37,10 +37,16 @@ static void unlock(void) {
 // (the cache is off meanwhile), and the ledger changes right when a device
 // connects, i.e. when input starts. 747c13d report: one 8-9 ms input delay
 // per save. So a change only marks the table dirty; orbit_ledger_flush()
-// writes it once the input has paused, or after LEDGER_FLUSH_MAX_US at the
-// latest, and the several changes of one connection become one write.
+// writes it once the input has paused for LEDGER_FLUSH_IDLE_US, and the
+// several changes of one connection become one write. Input that goes on
+// (a trackball sends every 8 ms) would defer it forever, so after
+// LEDGER_FLUSH_MAX_US the shorter LEDGER_FLUSH_GAP_US is enough: any hand
+// pauses that long within seconds (cd199a3 report: the 10 s deadline wrote
+// mid-input). Power loss costs at most a minute of changes; the rows come
+// back from the bonds and the next connection, only an alias could be lost.
 #define LEDGER_FLUSH_IDLE_US (1 * 1000000)
-#define LEDGER_FLUSH_MAX_US (10 * 1000000)
+#define LEDGER_FLUSH_MAX_US (60 * 1000000)
+#define LEDGER_FLUSH_GAP_US (200 * 1000)
 
 static volatile bool dirty;
 static int64_t dirty_since_us;
@@ -60,7 +66,9 @@ void orbit_ledger_flush(bool force, int64_t last_input_us) {
         return;
     }
     int64_t now = esp_timer_get_time();
-    if (!force && now - last_input_us < LEDGER_FLUSH_IDLE_US && now - dirty_since_us < LEDGER_FLUSH_MAX_US) {
+    int64_t idle = now - last_input_us;
+    bool overdue = now - dirty_since_us >= LEDGER_FLUSH_MAX_US;
+    if (!force && idle < (overdue ? LEDGER_FLUSH_GAP_US : LEDGER_FLUSH_IDLE_US)) {
         return;
     }
     lock();
