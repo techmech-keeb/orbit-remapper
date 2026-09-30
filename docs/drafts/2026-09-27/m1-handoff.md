@@ -10,15 +10,19 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `f2093b6` の試験（[報告](reports/m1-f2093b6-report.md)）：合格の基準を満たした。データ長の実験は効かなかった（`found by polling` が 12 回中 10 回、`da3c37f` は 9 回中 6 回）ので **取り消した**（`2e39104`）。Cube Turner の LED の点滅は PC 直結でも起きるので M5Dial とは無関係。
-- **知らせが届かない仕組みは NimBLE のソースで確定**：無線チップの Encryption Change が届いたとき、SM にその接続の手続きが無いと、`ble_sm_enc_event_rx()` は接続を「暗号化済み」と記録する（`bonded` と `key_size` は 0 のまま）が、`ble_sm_process_result()` が手続きを見つけられずにループを抜け、`ENC_CHANGE` を出さない（`ble_sm.c` の `if (proc == NULL) break;`）。観測（`enc=1 bonded=0 key_size=0`、知らせなし）と一致する。**SM に残っている手続きは無い**ので、30 秒の時間切れなどは起きない。手続きが `device started security itself` の後に消える理由は未確定（推測：Cube Turner が SM の PDU をもう 1 つ送り、NimBLE がそれを「順序違い」として手続きを捨てている）。
-- 版 **`2e08ac7`** の `orbit-m1-2e08ac7-ble.bin`（SHA-256 `2e7d9d203eb61419c26938e8de2bd38d2a0ec8135bdb25ffa66f4625fe19fdac`）を、利用者が受け取っている。アドレス `0x0`（ペアリング情報と設定は残る）。PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16)。中身は `da3c37f` ＋ 受け入れ条件の引き締め（`7eb602c`）で、データ長の設定は無い。コードの説明を上の仕組みに書き換えただけ。
-- やること（短く。`da3c37f` と同じ動きの確認）：
-  1. 書き込み後 RST。`default data length set` が**出ない**こと。2 台がそろうまでの時間。
-  2. Cube Turner の電源の入れ直しを 3 回。時間と、`encryption on` の行の末尾。
-  3. `WARNING`・`dropping the link` 0 回。数分使って切断 0。
-- 合格の基準：`da3c37f` と同等。これで PR #16 をマージできる状態にする。
-- 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、MD600・meteorite40 での `a0d8f9e` 以降、補正が働く機器、A5（BIOS）。
+- `2e08ac7` の短い確認（[報告](reports/m1-2e08ac7-report.md)）：`da3c37f` と同等で合格。データ長の設定は出ず、Cube Turner の電源の入れ直し 3 回は 1.6〜2.2 秒、`WARNING`・`dropping the link` 0 回。**PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16) はマージできる状態。** マージは利用者が判断する。
+- マージ前の判断（利用者）：MD600・meteorite40 で `a0d8f9e` 以降の版を試していない。回帰の恐れが小さい理由：この 2 台は自分から暗号化を始めない（`9309d56` までの流れは IST と同じで、IST は毎回 `encryption on (stored key)` が普通に届いている）。それでも短く確かめるなら、下の「MD600・meteorite40 の回帰確認」を行う。
+- いま試験することはない（回帰確認を行う場合を除く）。次の版ができたら、この §0 を書き換える。
+
+### MD600・meteorite40 の回帰確認（行う場合。版は `2e08ac7` のまま）
+
+1. Pair new device で MD600 と meteorite40 をペアリング（IST と Cube Turner はそのまま。ボンドは 4 件までなので、超えるなら Forget all devices から）。
+2. M5Dial の RST を 2 回。2 台が `(stored key)` でつながり、5 秒以内にそろうこと。
+3. 機器の電源の入れ直しを各 1 回。0.5〜1 秒でつながり直すこと。
+4. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内、`WARNING` 0 回。
+5. `encryption on` の行の末尾がどれかを報告する（何も無し／`before the connect event`／`found by polling`）。
+
+- 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、補正が働く機器、A5（BIOS）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ## 1. 結論（2026-09-27 時点）
