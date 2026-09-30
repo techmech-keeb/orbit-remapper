@@ -10,15 +10,14 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `230e758` の確認（[報告](../2026-09-27/reports/m2-230e758-report.md)）：時機の条件は設計どおりだが、3 点で不合格。**3 点とも PR #27 の中で直した**（→ `302af13`、3 コミット）。
-  1. ペアリング途中の接続を読み取りで受け入れて誤った WARNING → 報告の案どおり、**読み取りで受け入れるのは保存した鍵で暗号化された接続だけ**（通常時と同じ条件）にした。新しいペアリングは ENC_CHANGE で受け入れ、ENC_CHANGE が来なかったときは `security done`（PARING_COMPLETE）で受け入れる（`, at pairing complete (no ENC_CHANGE event)`）。
-  2. 期限後の切れ目でも入力と重なる → 報告の案どおり、**期限を無くし、1 秒の切れ目でだけ書く**。強制の書き込み（forget・move・書き込みモードの前）は今のまま。
-  3. ペアリングの探索中に IST の入力が減る → **機器がつながっているときは探索の聞き取りを 10 ms/100 ms に下げる**（何もつながっていなければ今までどおり 30/60）。ログは `scan start (pairing, listening 10/100 ms)`。効果は未確認（推測。S3 の無線の調停の設定は触っていない）。
-- **新しい版 `302af13`**（`orbit-m2-302af13-ble.bin`。名前と SHA-256 は利用者が貼る）。
+- `302af13` の確認（[報告](../2026-09-27/reports/m2-302af13-report.md)）：保存の期限と探索中の入力の減りは直った。誤った WARNING は、私が足した「PARING_COMPLETE の時点で受け入れる」経路で同じことが起きた（報告のとおり、この時点ではまだ鍵が保存されていない）。**`4903ae1` で直した**（PR #27 の中）：その経路を外し、読み取りで受け入れるのは「登録済みで、鍵が保存されていて、指紋が変わっていない（または受け入れ前に鍵が無かった新しいペアリング）」だけに。受け入れ済みの接続で指紋が 0 から初めて値になったときは「置き換え」ではなく「鍵が保存された」と扱う（`keys stored for this new pairing`）。報告の案の両方を組み合わせた形。
+- 報告の 2（`hub_port=2` の秒の `LAT` 3.6〜4.1 ms）：本家コアの記述子の解釈が主ループで走る分で、ペアリングのときだけ。急がないので m2-results §4 に記録し、手は入れない。
+- **新しい版 `4903ae1`**（`orbit-m2-4903ae1-ble.bin`。名前と SHA-256 は利用者が貼る）。`302af13` との違いは受け入れの経路だけ。
 - **試験**：
-  1. IST を動かし続けながら `orbit alias 2 pedal` → 動かし続ける限り `ledger saved` が出ず（60 秒を超えても）、手を止めた 1 秒後に出ること。その間の `LAT` が 3 ms 以内で `unrelated=0`。`orbit alias 2` で戻す。
-  2. IST を動かし続けながら `orbit forget 2` → `orbit pair` → Cube Turner をペアリングし直す（2 回）。見ること：`WARNING` が出ないこと、`encryption on (new pairing) pairing mode` か `at pairing complete` で受け入れること、`scan start (pairing, listening 10/100 ms)`、**探索中の IST の `rpt=`（1 秒あたりの件数）が 60 以上を保つか**、ペアリングにかかる時間（`pair_new_device` から `hub_port=2` まで）、保存が手を止めた後の 1 回にまとまること。
-  3. 3 分の使用で切断 0、`LAT` の基準（3 ms 超の秒が 1 分に 1 回以下、5 ms 以内）。
+  1. 書き込み後の起動で 2 台が `(stored key)` でつながること（`at pairing complete` の行は無くなる）。
+  2. IST を動かし続けながら `orbit forget 2` → `orbit pair` → Cube Turner をペアリングし直す（2 回）。**`WARNING` が 0 回**で、`encryption on (new pairing) pairing mode` か `new pairing found by polling` で受け入れ、切られずにそのままポート 2 で動くこと（`pair_new_device` から `hub_port=2` までの時間も）。
+  3. できれば：IST を **60 秒以上止めずに** 動かし続けながら `orbit alias 2 pedal` → 動かし続ける限り `ledger saved` が出ないこと（前回は手が 17 秒で止まり未確認）。`orbit alias 2` で戻す。
+  4. 3 分の使用で切断 0、`LAT` の基準（3 ms 超の秒が 1 分に 1 回以下、5 ms 以内）。
 - 合格なら **PR #27 はマージできる状態**（マージは利用者が判断する）。次は 2b。
 - **行う場合（MD600 があるとき）**：B5・B6 は下の手順のまま。
 - **注意**：ペアリング情報の上限が 4 → 15 になったので `sdkconfig` が変わる。書き込みは今までどおり 1 ファイル（NVS は消えない）。M1 のペアリング情報 2 件は、最初の起動で台帳に足される（`ledger: bond ... had no row, added as port N`。IST が 1、Cube Turner が 2 のはず＝M1 の `hub_port` と同じ）。
