@@ -10,19 +10,17 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- **M2 の 2a の版 `102144d`**（`orbit-m2-102144d-ble.bin`。名前と SHA-256 は利用者が貼る。依頼書 [m2-brief.md](../2026-09-30/m2-brief.md) §3、PR は利用者が貼る）。接続の処理は `2cb6aad` と同じ。足したもの：**機器台帳**（ポート番号の固定、名前の保存、同じ機器らしい古い行の自動引き継ぎ）、**ペアリング管理**（上限 15、いっぱいなら断る、1 台削除 `forget`、手動の引き継ぎ `move`、2 分で自動終了）、**組み直しの許可**（G-1〜G-4：`approval wanted` → 短い押し込みで 60 秒だけ許可）、**ログの COM ポートから打つ命令**（`orbit list` など。`firmware/orbit/README.md` §3）、**設定ツール向けの命令**（HID、0x80〜。今回は試験しない）。ログの新しい行：`LDG`（台帳）、`ORB`（1 秒ごとの状態）、`CMD`。`DEV` 行に `port=`、画面の機器行は `P<ポート>`。
+- `102144d` の試験（[報告](../2026-09-27/reports/m2-102144d-report.md)）：手順 1〜9 すべて合格。報告の 2 点への答え：①設定の保存中の 9.4 ms は M1 から同じ（保存は主ループで行う。2c で別タスクに移す）。②`heap_min` の 9 KB 減は、台帳の保存用の一時コピー 2 つ（約 3.7 KB）＋台帳本体（約 1.9 KB）＋NimBLE のペアリング情報の枠 4 → 15（約 3〜4 KB、推測）。一時コピーは次の版で無くした。
+- **新しい版 `747c13d`**（`orbit-m2-747c13d-ble.bin`。名前と SHA-256 は利用者が貼る）。`102144d` との違いは台帳の保存の仕方だけ。**台帳の保存形式が変わるので、最初の起動で `ledger version 1 is not 2, starting empty` が出て、ペアリング情報から行を作り直す**（ポート番号は同じ 1・2 のはず。別名は消える）。
+- **試験（短い）**：
+  1. 書き込み → `ledger version ... starting empty` → `ledger: bond ... added as port 1` / `port 2` → 2 台が `(stored key)` でつながり `port=` が IST 1・Cube Turner 2。
+  2. `orbit alias 2 pedal` → RST → `orbit list` で `alias="pedal"` が残っていること（新しい形式で保存できている）。`orbit alias 2` で消す。
+  3. 2 台つながった後の `heap_min` を写す（`102144d` の 84.4 KB より 3〜4 KB 増える見込み）。
+  4. 3 分の使用で切断 0、`LAT` 最大 3 ms 以内。
+- 合格なら **PR #27 はマージできる状態**（マージは利用者が判断する）。次は 2b。
+- **行う場合（MD600 があるとき）**：B5・B6 は下の手順のまま。
 - **注意**：ペアリング情報の上限が 4 → 15 になったので `sdkconfig` が変わる。書き込みは今までどおり 1 ファイル（NVS は消えない）。M1 のペアリング情報 2 件は、最初の起動で台帳に足される（`ledger: bond ... had no row, added as port N`。IST が 1、Cube Turner が 2 のはず＝M1 の `hub_port` と同じ）。
-- **命令の打ち方**：ログを取っている COM ポートに 1 行ずつ送る（PowerShell の `SerialPort` なら `$port.WriteLine("orbit list")`。DTR あり、改行で確定）。返事は `M1 CMD` と `M1 LDG` の行。
-- **試験**（依頼書の B1〜B3・B7 と回帰）：
-  1. 書き込み → 起動ログの `ledger loaded`、`ledger: bond ... added as port`、`LDG` の行を写す。2 台が `(stored key)` でつながり、`DEV` の `port=` が IST 1・Cube Turner 2 であること。設定ツールで A→B の割り当てをポート 1 に付けて保存し、IST のキーで効くこと（B2：M1 からの移行）。
-  2. `orbit list` → `LDG` に名前（`IST TrackBall`、`TurnerPro`）と `shown=` が入っていること。`ORB` 行を 1 つ写す。
-  3. `orbit alias 1 left` → `orbit list` の `shown="left"`。`orbit alias 1` で消える（`shown` が名前に戻る）。
-  4. RST を 2 回 → 毎回 `port=` が同じ（B1）。
-  5. `orbit forget 2` → Cube Turner が切れ（`forgotten, dropping the link`）、`ORB` が `devices=1/15`、待ち受けが 1 台になる。Cube Turner は待ち受けに入らない（つながらない）こと。
-  6. `orbit pair`（または画面 2 秒）→ Cube Turner の電源を入れ直す → 新しいペアリング → `ledger: new device, port 2` → `report map ... held until the ledger row is settled` → `info` 5 行 → `ledger: port 2 "TurnerPro" kind=...` → `report map ... hub_port=2` → `subscribed`。動くこと。**`held` から `hub_port=2` までの時間**を写す（初回だけの遅れ）。
-  7. `orbit pair` → 何もつながずに待つ → **120 秒で `pairing mode ended after 120 s`** が出て `WAIT` に戻ること（B7）。
-  8. `orbit approve`（何も聞かれていないとき）→ `approve: nothing is waiting for approval`。画面の短い押し込み（1 秒未満）でも同じ行が出ること。
-  9. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内。`ORB` 行が毎秒出ていること。
+- **命令の打ち方**：ログを取っている COM ポートに 1 行ずつ送る（改行で確定）。返事は `M1 CMD` と `M1 LDG` の行。
 - **行う場合（MD600 があるとき。B5・B6 の本番）**：
   - B5：Pair new device で MD600 をペアリング（ポート 3）→ `orbit alias 3 md600` → MD600 をリセット（アドレスが変わる）→ Pair new device で MD600 をもう一度ペアリング → `ledger: looks like port 3 (...), taking over its port` が出て、ポート 3・別名 `md600` のまま動くこと。`orbit list` で行が 3 つ（増えていない）。
   - B6：MD600 側で Orbit のペアリングを消す（アドレスが変わらない手順があれば）→ MD600 の電源を入れ直す → `approval wanted: device has no key for us; press the button within 60 s` → 画面を短く押す → `approved: port 3 ... may pair again` → MD600 が新しい鍵でつながり `new key accepted (approved by the user)`。もう一度同じことをして、今度は押さずに 60 秒待つ → `approval for port 3 not given within 60 s (1 of 3)`。
