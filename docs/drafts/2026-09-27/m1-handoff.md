@@ -10,18 +10,17 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `9309d56` の試験（[報告](reports/m1-9309d56-report.md)）：試せた手順の合格の基準はすべて満たした。Cube Turner は Pair new device なしで戻り、10 分の連続使用は切断 0、31 分間 2 台とも切断 0。**残り 1 つ**：機器の Security Request が `CONNECT` の後に来ると（`device started pairing itself`）、`enc=1` なのに知らせが届かず 5 秒で切られ、2 回目でつながる（6 場面中 4 回、7.7 秒）。
-- 直した版 **`da3c37f`** の `orbit-m1-da3c37f-ble.bin`（SHA-256 `83cb2a04bd7b61334ca4270b4b8ac2691b49c33d376bc3bb5a2fa33c3fd85e45`）を、利用者が受け取っている。アドレス `0x0`（ペアリング情報と設定は残る）。PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16)。1 コミット：
-  1. 暗号化を待っている間、毎秒その接続の状態を自分で読む（`waiting for encryption: enc= bonded= key_size=`）。`enc=1` なら `ENC_CHANGE` を待たずに受け入れる（`encryption on (stored key), noticed by polling`）。無線チップはその機器用に保存した鍵でしか暗号化しないので、通常時に別の鍵で通る穴にはならない。
-  2. 受け入れた後に `ENC_CHANGE` が来たら鍵の指紋を見直す。通常時に鍵が変わっていれば `WARNING: key replaced outside pairing mode` を出して切る。ペアリングモードなら `encryption changed again (new key, pairing mode)`。
-- 安全面の答え（報告の問い）：NimBLE が自分からペアリングに入るのは、①その機器の鍵を持っていないとき（通常時は許可リストの登録済み機器しかつながらないので起きない）、②登録済み機器が Pairing を求めたとき（`REPEAT_PAIRING`、通常時は断っている）、③保存した鍵で暗号化が済んだ後に機器が MITM か Secure Connections への格上げを求めたとき、の 3 つ。③は機器が保存した鍵を持っていると証明した後なので、別の入口ではない。`bonded=0 key_size=0` は③の途中の帳簿と見ている（推測）。Security Request の中身は NimBLE がアプリに渡さないので、コアに手を入れずには出せない。
+- `da3c37f` の試験（[報告](reports/m1-da3c37f-report.md)）：**合格の基準をすべて満たした。** Cube Turner の電源の入れ直し 5 回は 1.7〜2.3 秒（全部 `noticed by polling`）、RST 3 回は 2.6〜4.4 秒、5 分で切断 0、`WARNING` 0 回。
+- 報告の安全面の問い（`bonded=0 key_size=0` を保存した鍵とみなしてよいか）への答え：NimBLE のソースで確かめた。`bonded` と `key_size` は、NimBLE が暗号化の知らせを自分の手続きと結びつけられたときだけ更新される（`ble_sm_update_sec_state()` は 0 を書かない）。結びつかない知らせでは `enc` だけが立つ。通常時にその接続が別の鍵で暗号化されることはない：無線チップはそのアドレス用に保存した LTK でしか暗号化を始めず、NimBLE が登録済み機器と新しくペアリングするのは、保存した鍵で暗号化が済んだ後の格上げ（MITM か Secure Connections の要求）か、`REPEAT_PAIRING`（通常時は断っている）だけ。**ただし念のため条件を固めた**（下の 1）。
+- 直した版 **`f2093b6`** の `orbit-m1-f2093b6-ble.bin`（SHA-256 `be79abd8f3b53b5c4f51ad66f63286a58cece409d9cdc775399a70e4f2956fa3`）を、利用者が受け取っている。アドレス `0x0`（ペアリング情報と設定は残る）。PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16)。2 コミット：
+  1. `7eb602c`（受け入れ条件）：読み取りで受け入れるのは、通常時なら「登録済みのアドレスで、保存した鍵の指紋が変わっていない」ときだけ。外れたら `encrypted link with no bond or a changed key outside pairing mode, dropping the link`。行の文言は `encryption on (stored key), found by polling (NimBLE posted no event)`。`device started pairing itself` は `device started security itself (enc= bonded= key_size= at this moment)` に変えた。
+  2. `f2093b6`（実験）：起動時に無線チップのデータ長の既定値を 251 バイト・2120 µs にする（`default data length set rc=0x0`）。NimBLE は `CONNECT` を渡した直後に毎回 LE Set Data Length を出しており（コアの `ble_gap_event_connect_call()`）、S3 では暗号化の最中のデータ長変更が暗号化を壊す報告がある（esp-idf#19057）。知らせが失われた接続はすべて、暗号化が `CONNECT` をまたいだものだった。既定値を同じにすれば、接続ごとの要求で何も変わらない。**これが効けば、`found by polling` が減って `encryption on (stored key)` が普通に届くはず**（推測）。効かなくても読み取りが受け止める。
 - やること（機器は IST Trackball と Cube Turner PRO）：
-  1. 書き込み後 RST。2 台がそろうまでの時間。
-  2. **Cube Turner の電源の入れ直しを 5 回**。現れてから入力できるまでの時間と、`before the connect event` / `noticed by polling` / `device started pairing itself` のどれが出たか。`no answer` で切られないこと。
-  3. M5Dial の RST を 3 回。2 台そろうまでの時間。
-  4. `waiting for encryption:` の行が出た場面があれば、その前後の行を報告する（`device started pairing itself` から受け入れまでの流れ）。
-  5. `WARNING` 0 回、止まる不具合 0 回。5 分ほど 2 台を使って切断 0。
-- 合格の基準：2 で 5 回とも 3 秒以内につながり、`no answer` 0 回。3 で 3 回とも 5 秒以内。
+  1. 書き込み後 RST。`default data length set rc=0x0` が出ること。2 台がそろうまでの時間。
+  2. **Cube Turner の電源の入れ直しを 5 回**。現れてから入力できるまでの時間と、`encryption on` の行の末尾がどれか（何も無し／`, before the connect event`／`, found by polling (...)`）。`device started security itself (...)` の括弧の値も。
+  3. M5Dial の RST を 3 回。
+  4. `WARNING`・`dropping the link` 0 回、止まる不具合 0 回。5 分ほど 2 台を使って切断 0。
+- 合格の基準：`da3c37f` と同等以下の時間で、`dropping the link` 0 回。2 で `found by polling` が減っていれば実験が効いた印（減らなくても不合格ではない）。
 - 未確認のまま：スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき（捨て方が不明）、MD600・meteorite40 での `a0d8f9e` 以降、A5（BIOS）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
