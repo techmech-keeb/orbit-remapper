@@ -29,7 +29,7 @@ typedef struct {
 
 typedef struct {
     uint16_t interface;
-    uint8_t hub_port;   // 1-based position in the bond list, as upstream; 0 if not bonded
+    uint8_t hub_port;   // the device's ledger port (1..15); 0 when it has no row
     uint16_t len;
     uint8_t data[ORBIT_REPORT_MAP_MAX];
 } orbit_report_map_t;

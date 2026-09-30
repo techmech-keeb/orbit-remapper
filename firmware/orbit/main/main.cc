@@ -34,6 +34,7 @@
 #include "log.h"
 #include "orbit.h"
 #include "storage.h"
+#include "ledger.h"
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
 #define PIN_BUTTON     42 // screen push button, low when pressed
@@ -376,6 +377,7 @@ extern "C" void app_main() {
     olog("M1 EVT t=%.3f config loaded from NVS err=0x%x%s\n", orbit_now_s(), cfg_err,
          cfg_err == ESP_OK ? "" : " (using defaults)");
     orbit_storage_log_usage();
+    orbit_ledger_init();
 
     xTaskCreatePinnedToCore(main_loop, "main_loop", 8192, NULL, 10, &main_task, 1);
     orbit_ble_start(main_task);

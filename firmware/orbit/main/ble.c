@@ -20,6 +20,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "ble.h"
+#include "ledger.h"
 #include "log.h"
 
 #define UUID_HID_SERVICE 0x1812
@@ -139,6 +140,13 @@ struct dev {
     uint16_t report_map_handle;
     orbit_report_map_t report_map;
     int info_step; // next entry of info_reads[] to read after subscribing (requirement B)
+    // What the device said about itself, handed to the ledger once all reads are done.
+    char info_name[ORBIT_LEDGER_TEXT_MAX + 1];
+    char info_manufacturer[ORBIT_LEDGER_TEXT_MAX + 1];
+    char info_model[ORBIT_LEDGER_TEXT_MAX + 1];
+    uint16_t info_vid, info_pid, info_appearance;
+    bool map_pending; // report map held back until the ledger row is settled (new device)
+    uint32_t map_hash;
 
     // Report statistics
     int64_t last_report_us;
@@ -192,6 +200,7 @@ static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
 static struct ble_npl_event periodic_ev, pair_ev, stop_pair_ev, clear_bonds_ev;
 static char last_event[24] = "START";
+static bool duplicates_seen; // two or more ledger rows look like one device (info_done)
 static TaskHandle_t wake_task;
 static QueueHandle_t report_q, report_map_q, disconnect_q;
 static uint32_t reports_lost;
@@ -257,6 +266,7 @@ static void discover_next_report(dev_t* d);
 static void start_discovery(dev_t* d);
 static void schedule(void);
 static bool is_bonded(const ble_addr_t* addr);
+static int ensure_row(dev_t* d);
 
 static double now_s(void) {
     return esp_timer_get_time() / 1e6;
@@ -416,6 +426,11 @@ static void on_encrypted(dev_t* d, const char* when) {
     }
     d->key_tag = now_tag;
     peers_only = true; // as upstream: back to bonded devices only after a successful pairing
+    int port = ensure_row(d);
+    if (port != 0) {
+        orbit_ledger_touch(port);
+        orbit_ledger_set_key(port, true);
+    }
     if (d->discovering) {
         // Subscribing before encryption may have failed; retry once it is up.
         if (d->discovery_finished) {
@@ -448,6 +463,23 @@ static int bond_index(const ble_addr_t* addr) {
         }
     }
     return 0;
+}
+
+// The ledger row of this device, made when a new device has just bonded
+// (pairing mode). Returns its port, 0 when not bonded yet or the ledger is
+// full.
+static int ensure_row(dev_t* d) {
+    int port = orbit_ledger_port(&d->addr);
+    if (port != 0 || !is_bonded(&d->addr)) {
+        return port;
+    }
+    port = orbit_ledger_add(&d->addr, true);
+    if (port == 0) {
+        EVT(d, "ledger full, no port for this device");
+    } else {
+        EVT(d, "ledger: new device, port %d", port);
+    }
+    return port;
 }
 
 static const struct ble_gap_conn_params conn_params = {
@@ -874,14 +906,25 @@ static int on_info(uint16_t conn_handle, const struct ble_gatt_error* error, str
         os_mbuf_copydata(attr->om, 0, len, v);
         uint16_t uuid = info_reads[d->info_step].uuid;
         if (uuid == UUID_APPEARANCE && len >= 2) {
-            EVT(d, "info %s=0x%04x", what, (unsigned) (v[0] | (v[1] << 8)));
+            d->info_appearance = (uint16_t) (v[0] | (v[1] << 8));
+            EVT(d, "info %s=0x%04x", what, d->info_appearance);
         } else if (uuid == UUID_PNP_ID && len >= 7) {
-            EVT(d, "info %s: vendor_source=%u vid=0x%04x pid=0x%04x version=0x%04x", what, v[0],
-                (unsigned) (v[1] | (v[2] << 8)), (unsigned) (v[3] | (v[4] << 8)), (unsigned) (v[5] | (v[6] << 8)));
+            d->info_vid = (uint16_t) (v[1] | (v[2] << 8));
+            d->info_pid = (uint16_t) (v[3] | (v[4] << 8));
+            EVT(d, "info %s: vendor_source=%u vid=0x%04x pid=0x%04x version=0x%04x", what, v[0], d->info_vid,
+                d->info_pid, (unsigned) (v[5] | (v[6] << 8)));
         } else {
             char text[32];
             copy_printable(text, sizeof(text), v, len);
             EVT(d, "info %s=\"%s\" (%d byte(s))", what, text, len);
+            char* dst = uuid == UUID_DEVICE_NAME    ? d->info_name
+                        : uuid == UUID_MANUFACTURER ? d->info_manufacturer
+                        : uuid == UUID_MODEL_NUMBER ? d->info_model
+                                                    : NULL;
+            if (dst != NULL) {
+                strncpy(dst, text, ORBIT_LEDGER_TEXT_MAX);
+                dst[ORBIT_LEDGER_TEXT_MAX] = '\0';
+            }
         }
         return 0; // NimBLE reports the end with BLE_HS_EDONE
     }
@@ -895,8 +938,63 @@ static int on_info(uint16_t conn_handle, const struct ble_gatt_error* error, str
     return 0;
 }
 
+// Hands the report map to the core. Delayed for a new device until its
+// ledger row is settled, so that the core hears the final port number.
+static void deliver_report_map(dev_t* d) {
+    orbit_report_map_t* m = &d->report_map;
+    m->hub_port = orbit_ledger_port(&d->addr);
+    d->map_pending = false;
+    EVT(d, "report map %u byte(s) hash=%08x, hub_port=%u", m->len, (unsigned) d->map_hash, m->hub_port);
+    if (m->len > 0 && xQueueSend(report_map_q, m, 0) == pdTRUE) {
+        wake();
+    }
+}
+
+// All reads done: fill the ledger row. A row added in this session is
+// compared with the older rows: when exactly one looks like the same
+// device and that one is not connected, the new row takes over its port
+// (requirement D, decision J3: a device whose address changed after a
+// reset). With two or more candidates nothing is replaced; the user picks.
+static void info_done(dev_t* d) {
+    int port = orbit_ledger_port(&d->addr);
+    if (port == 0) {
+        if (d->map_pending) {
+            deliver_report_map(d);
+        }
+        return;
+    }
+    orbit_ledger_set_text(port, d->info_name, d->info_manufacturer, d->info_model);
+    orbit_ledger_set_ids(port, d->info_vid, d->info_pid, d->info_appearance);
+    orbit_ledger_row_t row;
+    if (orbit_ledger_get(port, &row) && (row.flags & ORBIT_LEDGER_NEW)) {
+        int similar[ORBIT_LEDGER_MAX];
+        int n = orbit_ledger_similar(port, similar, ORBIT_LEDGER_MAX);
+        orbit_ledger_row_t old;
+        if (n == 1 && orbit_ledger_get(similar[0], &old) && !addr_in_use(&old.addr)) {
+            EVT(d, "ledger: looks like port %d (addr=..:%02x:%02x, not connected), taking over its port", similar[0],
+                old.addr.val[1], old.addr.val[0]);
+            orbit_ledger_move(port, similar[0]);
+            ble_store_util_delete_peer(&old.addr);
+            port = similar[0];
+        } else if (n >= 1) {
+            EVT(d, "ledger: %d row(s) look like this device, kept as port %d; forget the old one by hand", n, port);
+            duplicates_seen = true;
+        }
+        orbit_ledger_clear_flag(port, ORBIT_LEDGER_NEW);
+    }
+    char name[64];
+    if (orbit_ledger_get(port, &row)) {
+        orbit_ledger_display_name(&row, name, sizeof(name));
+        EVT(d, "ledger: port %d \"%s\" kind=%s", port, name, orbit_ledger_kind_name(row.kind));
+    }
+    if (d->map_pending) {
+        deliver_report_map(d);
+    }
+}
+
 static void read_next_info(dev_t* d) {
     if (d->info_step >= (int) (sizeof(info_reads) / sizeof(info_reads[0]))) {
+        info_done(d);
         return;
     }
     int rc = ble_gattc_read_by_uuid(d->conn_handle, 1, 0xFFFF, BLE_UUID16_DECLARE(info_reads[d->info_step].uuid),
@@ -1072,14 +1170,22 @@ static int on_report_map(uint16_t conn_handle, const struct ble_gatt_error* erro
         m->len = 0; // a partial descriptor must not reach the core
     }
     m->interface = (uint16_t) ((d - devs) << 8);
-    m->hub_port = bond_index(&d->addr);
     uint32_t hash = 2166136261u; // FNV-1a: tells report maps apart in the log without dumping them
     for (unsigned i = 0; i < m->len; i++) {
         hash = (hash ^ m->data[i]) * 16777619u;
     }
-    EVT(d, "report map %u byte(s) hash=%08x, hub_port=%u", m->len, (unsigned) hash, m->hub_port);
-    if (m->len > 0 && xQueueSend(report_map_q, m, 0) == pdTRUE) {
-        wake();
+    d->map_hash = hash;
+    int port = ensure_row(d);
+    orbit_ledger_row_t row;
+    bool is_new = port != 0 && orbit_ledger_get(port, &row) && (row.flags & ORBIT_LEDGER_NEW);
+    if (port != 0 && m->len > 0) {
+        orbit_ledger_set_map(port, hash, orbit_ledger_kind_of_map(m->data, m->len));
+    }
+    if (is_new) {
+        d->map_pending = true; // the port may still change in info_done()
+        EVT(d, "report map %u byte(s) hash=%08x, held until the ledger row is settled", m->len, (unsigned) hash);
+    } else {
+        deliver_report_map(d);
     }
     d->cur_chr = 0;
     discover_next_report(d);
@@ -1608,6 +1714,16 @@ static void on_sync(void) {
     for (int i = 0; i < n; i++) {
         olog("M1 EVT t=%.3f bond %d addr=..:%02x:%02x kind=%s\n", now_s(), i + 1, peers[i].val[1], peers[i].val[0],
              addr_kind(&peers[i]));
+    }
+    orbit_ledger_sync_bonds(peers, n);
+    orbit_ledger_row_t row;
+    for (int i = 0; orbit_ledger_nth(i, &row); i++) {
+        char name[64];
+        orbit_ledger_display_name(&row, name, sizeof(name));
+        olog("M1 LDG t=%.3f port=%d addr=..:%02x:%02x %s key=%s kind=%s vid=%04x pid=%04x hash=%08x last=%lu \"%s\"\n",
+             now_s(), row.port, row.addr.val[1], row.addr.val[0], addr_kind(&row.addr),
+             (row.flags & ORBIT_LEDGER_NO_KEY) ? "none" : "yes", orbit_ledger_kind_name(row.kind), row.vid, row.pid,
+             (unsigned) row.map_hash, (unsigned long) row.last_used, name);
     }
     schedule();
 }
