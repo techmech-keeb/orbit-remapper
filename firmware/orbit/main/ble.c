@@ -637,7 +637,19 @@ static void periodic_check(struct ble_npl_event* ev) {
                 EVT(d, "waiting for encryption: enc=%u bonded=%u key_size=%u", desc.sec_state.encrypted,
                     desc.sec_state.bonded, desc.sec_state.key_size);
                 if (desc.sec_state.encrypted) {
-                    on_encrypted(d, ", noticed by polling");
+                    // NimBLE did not tie this encryption to a procedure of
+                    // its own (bonded and key_size stay 0 then), so it never
+                    // posted ENC_CHANGE. Outside pairing mode the link can
+                    // only be encrypted with the key we hold for this bonded
+                    // address: NimBLE pairs a bonded peer afresh only after
+                    // that key has been used (security elevation), or on
+                    // REPEAT_PAIRING, which we refuse. So accept it when the
+                    // address is bonded and the stored key is unchanged.
+                    if (peers_only && (!is_bonded(&d->addr) || key_tag(&d->addr) != d->key_tag)) {
+                        give_up_on(d, "encrypted link with no bond or a changed key outside pairing mode", 0);
+                        continue;
+                    }
+                    on_encrypted(d, ", found by polling (NimBLE posted no event)");
                     continue;
                 }
             }
@@ -1208,7 +1220,13 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // The device started pairing on its own; ours is not needed.
             // Retrying after its pairing succeeds re-encrypts an encrypted
             // link and the device drops it (a0d8f9e report, Cube Turner PRO).
-            EVT(d, "device started pairing itself");
+            struct ble_gap_conn_desc now_desc;
+            if (ble_gap_conn_find(d->conn_handle, &now_desc) == 0) {
+                EVT(d, "device started security itself (enc=%u bonded=%u key_size=%u at this moment)",
+                    now_desc.sec_state.encrypted, now_desc.sec_state.bonded, now_desc.sec_state.key_size);
+            } else {
+                EVT(d, "device started security itself");
+            }
         } else if (rc != 0) {
             // NimBLE runs one pairing/encryption procedure at a time
             // (BLE_SM_MAX_PROCS = 1), so this fails with rc=0x6 while the
