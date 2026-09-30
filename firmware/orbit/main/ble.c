@@ -27,6 +27,12 @@
 #define UUID_REPORT      0x2A4D
 #define UUID_CCCD        0x2902
 #define UUID_REPORT_REF  0x2908
+// Read once per link after subscribing, for the device ledger (requirement B).
+#define UUID_DEVICE_NAME  0x2A00
+#define UUID_APPEARANCE   0x2A01
+#define UUID_MODEL_NUMBER 0x2A24
+#define UUID_MANUFACTURER 0x2A29
+#define UUID_PNP_ID       0x2A50
 
 #define REPORT_TYPE_INPUT 1
 
@@ -132,6 +138,7 @@ struct dev {
     int subscribed;
     uint16_t report_map_handle;
     orbit_report_map_t report_map;
+    int info_step; // next entry of info_reads[] to read after subscribing (requirement B)
 
     // Report statistics
     int64_t last_report_us;
@@ -705,6 +712,16 @@ static bool is_bonded(const ble_addr_t* addr) {
     return bond_index(addr) != 0;
 }
 
+// Device names are shown and logged as they come, so anything outside
+// printable ASCII becomes '?' and long names are cut.
+static void copy_printable(char* out, size_t out_len, const uint8_t* in, size_t in_len) {
+    size_t n = 0;
+    for (; n < in_len && n + 1 < out_len; n++) {
+        out[n] = (in[n] >= 0x20 && in[n] < 0x7F) ? (char) in[n] : '?';
+    }
+    out[n] = '\0';
+}
+
 // A keyboard waking from sleep may advertise without the HID UUID
 // (prior-art.md, esp32-hid-gamepad-bridge §4.20), so bonded addresses and
 // directed advertising count as well.
@@ -766,7 +783,15 @@ static void connect_to(const struct ble_gap_disc_desc* disc) {
     connecting = true;
     connecting_since_us = esp_timer_get_time();
     connecting_cancel_logged = false;
-    EVT(d, "connecting rssi=%d adv_type=%u addr_kind=%s", disc->rssi, disc->event_type, addr_kind(&disc->addr));
+    struct ble_hs_adv_fields fields;
+    char name[32] = "";
+    unsigned appearance = 0;
+    if (ble_hs_adv_parse_fields(&fields, disc->data, disc->length_data) == 0) {
+        copy_printable(name, sizeof(name), fields.name, fields.name_len);
+        appearance = fields.appearance_is_present ? fields.appearance : 0;
+    }
+    EVT(d, "connecting rssi=%d adv_type=%u addr_kind=%s adv_name=\"%s\" adv_appearance=0x%04x", disc->rssi,
+        disc->event_type, addr_kind(&disc->addr), name, appearance);
 }
 
 static dev_t* connecting_slot(void) {
@@ -793,11 +818,80 @@ static void restart_discovery_if_unsubscribed(dev_t* d) {
     start_discovery(d);
 }
 
+// ---- Device information (requirement B) ----
+//
+// Read after the reports are subscribed, so that a slow or absent answer
+// costs nothing but the log line. Each read is one Read By Type over the
+// whole database; a device without the characteristic answers "attribute
+// not found", logged as none.
+
+static const struct {
+    uint16_t uuid;
+    const char* what;
+} info_reads[] = {
+    {UUID_DEVICE_NAME, "name"},
+    {UUID_APPEARANCE, "appearance"},
+    {UUID_MANUFACTURER, "manufacturer"},
+    {UUID_MODEL_NUMBER, "model"},
+    {UUID_PNP_ID, "pnp_id"},
+};
+
+static void read_next_info(dev_t* d);
+
+static int on_info(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr, void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0; // a procedure of an earlier link on this slot (8061951 report, problem G)
+    }
+    const char* what = info_reads[d->info_step].what;
+    if (error->status == 0 && attr->om != NULL) {
+        uint8_t v[64];
+        int len = OS_MBUF_PKTLEN(attr->om);
+        if (len > (int) sizeof(v)) {
+            len = sizeof(v);
+        }
+        os_mbuf_copydata(attr->om, 0, len, v);
+        uint16_t uuid = info_reads[d->info_step].uuid;
+        if (uuid == UUID_APPEARANCE && len >= 2) {
+            EVT(d, "info %s=0x%04x", what, (unsigned) (v[0] | (v[1] << 8)));
+        } else if (uuid == UUID_PNP_ID && len >= 7) {
+            EVT(d, "info %s: vendor_source=%u vid=0x%04x pid=0x%04x version=0x%04x", what, v[0],
+                (unsigned) (v[1] | (v[2] << 8)), (unsigned) (v[3] | (v[4] << 8)), (unsigned) (v[5] | (v[6] << 8)));
+        } else {
+            char text[32];
+            copy_printable(text, sizeof(text), v, len);
+            EVT(d, "info %s=\"%s\" (%d byte(s))", what, text, len);
+        }
+        return 0; // NimBLE reports the end with BLE_HS_EDONE
+    }
+    if (error->status == BLE_HS_ATT_ERR(BLE_ATT_ERR_ATTR_NOT_FOUND)) {
+        EVT(d, "info %s: none", what);
+    } else if (error->status != BLE_HS_EDONE) {
+        EVT(d, "info %s: read failed status=0x%x", what, error->status);
+    }
+    d->info_step++;
+    read_next_info(d);
+    return 0;
+}
+
+static void read_next_info(dev_t* d) {
+    if (d->info_step >= (int) (sizeof(info_reads) / sizeof(info_reads[0]))) {
+        return;
+    }
+    int rc = ble_gattc_read_by_uuid(d->conn_handle, 1, 0xFFFF, BLE_UUID16_DECLARE(info_reads[d->info_step].uuid),
+                                    on_info, d->ctx);
+    if (rc != 0) {
+        EVT(d, "info %s: read start failed rc=0x%x", info_reads[d->info_step].what, rc);
+    }
+}
+
 static void discovery_done(dev_t* d) {
     d->discovery_finished = true;
     if (d->subscribed > 0) {
         d->stalls = 0;
         fail_clear(&d->addr);
+        d->info_step = 0;
+        read_next_info(d);
     }
     EVT(d, "subscribed %d input report(s)", d->subscribed);
     if (d->rediscover) {
@@ -958,7 +1052,11 @@ static int on_report_map(uint16_t conn_handle, const struct ble_gatt_error* erro
     }
     m->interface = (uint16_t) ((d - devs) << 8);
     m->hub_port = bond_index(&d->addr);
-    EVT(d, "report map %u byte(s), hub_port=%u", m->len, m->hub_port);
+    uint32_t hash = 2166136261u; // FNV-1a: tells report maps apart in the log without dumping them
+    for (unsigned i = 0; i < m->len; i++) {
+        hash = (hash ^ m->data[i]) * 16777619u;
+    }
+    EVT(d, "report map %u byte(s) hash=%08x, hub_port=%u", m->len, (unsigned) hash, m->hub_port);
     if (m->len > 0 && xQueueSend(report_map_q, m, 0) == pdTRUE) {
         wake();
     }
