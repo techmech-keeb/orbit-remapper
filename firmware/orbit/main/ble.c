@@ -809,10 +809,18 @@ static void periodic_check(struct ble_npl_event* ev) {
                     // that key has been used (security elevation), or on
                     // REPEAT_PAIRING, which we refuse. So accept it when the
                     // address is bonded and the stored key is unchanged.
-                    if (peers_only && !approved_for(&d->addr) &&
-                        (!is_bonded(&d->addr) || key_tag(&d->addr) != d->key_tag)) {
-                        ask_approval(d, "device paired with a new key");
-                        give_up_on(d, "encrypted link with no bond or a changed key outside pairing mode", 0);
+                    if (!is_bonded(&d->addr) || key_tag(&d->addr) != d->key_tag) {
+                        if (peers_only && !approved_for(&d->addr)) {
+                            ask_approval(d, "device paired with a new key");
+                            give_up_on(d, "encrypted link with no bond or a changed key outside pairing mode", 0);
+                        }
+                        // Pairing mode (or approved): a pairing is still
+                        // running; the link is encrypted with a key that
+                        // is not stored yet. Accepting it here ended
+                        // pairing mode early, and the keys that arrived a
+                        // moment later then read as "replaced outside
+                        // pairing mode" (230e758 report). Its own events
+                        // (ENC_CHANGE, PARING_COMPLETE) accept it.
                         continue;
                     }
                     on_encrypted(d, ", found by polling (NimBLE posted no event)");
@@ -1801,6 +1809,14 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // Posted for a stored-key encryption too, not only for a pairing.
             EVT(d, "security done status=0x%x", event->pairing_complete.status);
             log_security(d, "after security");
+            struct ble_gap_conn_desc desc;
+            if (event->pairing_complete.status == 0 && !d->encrypted && ble_gap_conn_find(d->conn_handle, &desc) == 0 &&
+                desc.sec_state.encrypted) {
+                // A pairing whose ENC_CHANGE never reached us; the keys are
+                // stored now, so this is the point to accept the link.
+                d->sec_pending = false;
+                on_encrypted(d, ", at pairing complete (no ENC_CHANGE event)");
+            }
         }
         return 0;
 
