@@ -35,6 +35,7 @@
 #include "orbit.h"
 #include "storage.h"
 #include "ledger.h"
+#include "commands.h"
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
 #define PIN_BUTTON     42 // screen push button, low when pressed
@@ -146,15 +147,15 @@ static void report_device(int i, double t, const orbit_dev_stats_t* s, display_l
     struct ble_gap_conn_desc desc = {};
     ble_gap_conn_find(s->conn_handle, &desc);
     double itvl_ms = desc.conn_itvl * 1.25;
-    olog("M1 DEV t=%.0f D%d addr=..:%02x:%02x h=%u itvl=%u(%.2fms) lat=%u to=%u enc=%d subs=%d "
+    olog("M1 DEV t=%.0f D%d addr=..:%02x:%02x port=%d h=%u itvl=%u(%.2fms) lat=%u to=%u enc=%d subs=%d "
          "rpt=%lu maxgap=%.1fms gaps<=8/16/32/>32=%lu/%lu/%lu/%lu total=%lu disc=%lu\n",
-         t, i, s->addr_lo[1], s->addr_lo[0], s->conn_handle, desc.conn_itvl, itvl_ms, desc.conn_latency,
+         t, i, s->addr_lo[1], s->addr_lo[0], s->port, s->conn_handle, desc.conn_itvl, itvl_ms, desc.conn_latency,
          desc.supervision_timeout, s->encrypted, s->subscribed, (unsigned long) s->reports, s->max_gap_us / 1000.0,
          (unsigned long) s->gaps[GAP_LE_8MS], (unsigned long) s->gaps[GAP_LE_16MS],
          (unsigned long) s->gaps[GAP_LE_32MS], (unsigned long) s->gaps[GAP_OVER_32MS],
          (unsigned long) s->total_reports, (unsigned long) s->disconnects);
     uint16_t c = desc.conn_itvl == 6 ? GREEN : YELLOW;
-    set_line(&lines[0], c, "D%d %02X%02X %.2fMS", i, s->addr_lo[1], s->addr_lo[0], itvl_ms);
+    set_line(&lines[0], c, "P%d %02X%02X %.2fMS", s->port, s->addr_lo[1], s->addr_lo[0], itvl_ms);
     set_line(&lines[1], WHITE, "L%u %s S%d R%lu", desc.conn_latency, s->encrypted ? "ENC" : "RAW", s->subscribed,
              (unsigned long) s->reports);
 }
@@ -185,6 +186,7 @@ static void status_task(void* arg) {
         set_line(&lines[2], orbit_ble_pairing() ? YELLOW : WHITE, "%s %d/%d",
                  orbit_ble_pairing() ? "PAIRING" : orbit_ble_scanning() ? "SCAN" : orbit_ble_waiting() ? "WAIT" : "IDLE",
                  conn, ORBIT_MAX_DEVS);
+        orbit_commands_log_state(t);
         orbit_dev_stats_t st;
         for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
             orbit_ble_take_stats(i, &st);
@@ -238,6 +240,7 @@ static void main_loop(void* arg) {
 
         tud_task_ext(0, false);
         orbit_log_pump();
+        orbit_commands_poll();
 
         // From the BLE task (decision I2: only this task calls the core).
         orbit_disconnect_t disc;

@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.cc" "usb.cc" "platform.cc" "storage.cc" "log.c" "ble.c" "ledger.c" "display.c" "font5x7.c"
+idf_component_register(SRCS "main.cc" "commands.cc" "usb.cc" "platform.cc" "storage.cc" "log.c" "ble.c" "ledger.c" "display.c" "font5x7.c"
                        INCLUDE_DIRS "."
                        PRIV_REQUIRES hid_remapper_core bt usb nvs_flash esp_timer esp_app_format
                                      esp_driver_gpio esp_driver_spi esp_lcd hal)

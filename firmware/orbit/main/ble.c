@@ -2085,6 +2085,10 @@ void orbit_ble_approval(orbit_approval_t* out) {
     }
 }
 
+bool orbit_ble_duplicates(void) {
+    return duplicates_seen;
+}
+
 bool orbit_ble_bonds_full(void) {
     return bonds_full_seen;
 }
@@ -2118,6 +2122,7 @@ void orbit_ble_take_stats(int i, orbit_dev_stats_t* out) {
     d->max_gap_us = 0;
     memset(d->gaps, 0, sizeof(d->gaps));
     portEXIT_CRITICAL(&stats_mux);
+    out->port = out->connected ? orbit_ledger_port(&d->addr) : 0;
 }
 
 int orbit_ble_connected_count(void) {

@@ -45,6 +45,7 @@ typedef struct {
     bool connected;
     uint16_t conn_handle;
     uint8_t addr_lo[2]; // lowest two address bytes, [0] = least significant
+    int port;           // ledger port (0: none)
     bool encrypted;
     int subscribed;     // input Report characteristics with notifications on
     uint32_t reports;   // reports in this window
@@ -79,6 +80,7 @@ void orbit_ble_stop_pairing(void);
 void orbit_ble_forget(int port);              // drop the device's bond, row and link
 void orbit_ble_move(int new_port, int old_port); // the device on new_port takes over old_port
 bool orbit_ble_bonds_full(void);              // a pairing was refused because all 15 ports are taken
+bool orbit_ble_duplicates(void);              // two or more ledger rows look like one device; the user picks
 
 // Requirement G: a bonded device asking to pair again outside pairing mode.
 typedef struct {
