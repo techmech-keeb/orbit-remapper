@@ -600,15 +600,21 @@ static void start_scan(void) {
     // per scan, so a device skipped while it was being avoided (or while it
     // was busy) would never be seen again until the scan restarted (0a0cfcf
     // report: a bonded keyboard stayed invisible for an hour).
+    // 30 ms of every 60 ms when nothing is connected. With a device
+    // connected, the scan took the radio away from it: the IST Trackball's
+    // reports fell from 100/s to near 0 while pairing another device
+    // (230e758 report), so then listen 10 ms of every 100 ms; pairing
+    // takes a little longer.
+    bool busy = orbit_ble_connected_count() > 0;
     const struct ble_gap_disc_params params = {
-        .itvl = 0x60,   // 60 ms
-        .window = 0x30, // 30 ms
+        .itvl = busy ? 0xA0 : 0x60,   // 100 ms : 60 ms
+        .window = busy ? 0x10 : 0x30, // 10 ms : 30 ms
         .filter_duplicates = 0,
     };
     int rc = ble_gap_disc(own_addr_type, BLE_HS_FOREVER, &params, gap_event, NULL);
     if (rc == 0) {
         scanning = true;
-        olog("M1 EVT t=%.3f scan start (pairing)\n", now_s());
+        olog("M1 EVT t=%.3f scan start (pairing, listening %s)\n", now_s(), busy ? "10/100 ms" : "30/60 ms");
     } else if (rc != last_scan_rc) {
         // Retried every second by periodic_check(), so only report changes.
         olog("M1 EVT t=%.3f scan start failed rc=0x%x hci=0x%02x\n", now_s(), rc, hci(rc));
