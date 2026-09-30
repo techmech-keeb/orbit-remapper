@@ -311,8 +311,11 @@ static void main_loop(void* arg) {
             // Every release is logged so that a short press can be lined up
             // with the LAT lines (2cb6aad report).
             if (button_down_us > 0) {
-                olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(),
-                     (long long) ((esp_timer_get_time() - button_down_us) / 1000));
+                int64_t held_ms = (esp_timer_get_time() - button_down_us) / 1000;
+                olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(), (long long) held_ms);
+                if (held_ms >= 30) {
+                    orbit_ble_approve(); // G-2: a short press answers an open approval question
+                }
             } else {
                 olog("M1 EVT t=%.3f button released after the %d ms hold\n", orbit_now_s(), BUTTON_HOLD_MS);
             }

@@ -79,6 +79,18 @@ void orbit_ble_stop_pairing(void);
 void orbit_ble_forget(int port);              // drop the device's bond, row and link
 void orbit_ble_move(int new_port, int old_port); // the device on new_port takes over old_port
 bool orbit_ble_bonds_full(void);              // a pairing was refused because all 15 ports are taken
+
+// Requirement G: a bonded device asking to pair again outside pairing mode.
+typedef struct {
+    bool wanted;         // a question is open (G-1)
+    int port;            // which device
+    const char* reason;
+    int remaining_s;     // seconds left to answer
+    int granted_port;    // 0, or the port that may pair again now (G-2)
+    int granted_remaining_s;
+} orbit_approval_t;
+void orbit_ble_approve(void); // answer the open question: let that device pair again
+void orbit_ble_approval(orbit_approval_t* out);
 int orbit_ble_pairing_remaining_s(void);      // seconds left in pairing mode; 0 when not pairing, -1 when open-ended
 
 // Copies device slot i and starts a new report window for it.
