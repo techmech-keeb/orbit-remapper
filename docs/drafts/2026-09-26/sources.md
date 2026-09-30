@@ -151,3 +151,37 @@ ESP-IDF の issue（2026-09-28 時点の状態）：
 
 - Logitech, Logi Bolt white paper: https://www.logitech.com/content/dam/logitech/en/business/pdf/logi-bolt-white-paper.pdf
 - Keychron, Wireless mouse and keyboard not working: https://www.keychron.com/blogs/news/keychron-wireless-mouse-and-keyboard-not-working
+
+## BLE アドレスの一意性（2026-09-29 確認）
+
+Q37 の根拠。いずれも最終確認日 2026-09-29。
+
+- Bluetooth Core 5.4 Vol 2 Part B §1.2（Bluetooth Device Address、EUI-48）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/br-edr-controller/baseband-specification.html
+- Bluetooth Core 5.4 Vol 6 Part B §1.3（Device Address：public、random static、RPA、身元アドレス）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/low-energy-controller/link-layer-specification.html
+- Bluetooth Core 5.4 Vol 3 Part C §10.7（Privacy、身元の一意性）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Core-54/out/en/host/generic-access-profile.html
+- IEEE RA, Guidelines for Use of EUI, OUI, and CID（2017-08-03）: https://standards.ieee.org/wp-content/uploads/import/documents/tutorials/eui.pdf
+- Bluetooth SIG, Device Information Service 1.2（2023-06-21）: https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/DIS_v1.2/out/en/index-en.html
+- Khadas フォーラム, Duplicate Bluetooth MAC addresses（2023-12）: https://forum.khadas.com/t/duplicate-bluetooth-mac-addresses/20923
+- dotintent/react-native-ble-plx #373（同一 MAC の 2 台、2018-11）: https://github.com/dotintent/react-native-ble-plx/issues/373
+- Nordic DevZone（DEVICEADDR の一意性）: https://devzone.nordicsemi.com/f/nordic-q-a/7512
+- ESP-IDF Misc System API（base MAC の派生）: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/misc_system_api.html
+
+## 接続数とペアリング情報の上限（2026-09-30 確認）
+
+[ble-limits-prior-art.md](../2026-09-30/ble-limits-prior-art.md) の出典。いずれも最終確認日 2026-09-30。
+
+- jfedor2/hid-remapper `firmware-bluetooth/prj.conf`・`src/main.cc`（51ab8b3、手元の取り込み済みソースで確認）: https://github.com/jfedor2/hid-remapper/tree/master/firmware-bluetooth
+- Zephyr `subsys/bluetooth/host/Kconfig`（`BT_MAX_PAIRED`、`BT_KEYS_OVERWRITE_OLDEST` の説明）: https://github.com/zephyrproject-rtos/zephyr/blob/main/subsys/bluetooth/host/Kconfig
+- Microsoft Q&A, How many BLE bonding/connection are supported by windows?（2021-06-28 回答）: https://learn.microsoft.com/en-us/answers/questions/452987/how-many-ble-bonding-connection-are-supported-by-w
+- Microsoft Q&A, To many Bluetooth LE Generic attribute service devices（2026-04-06）: https://learn.microsoft.com/en-us/answers/questions/5852092/to-many-bluetooth-le-generic-attribute-service-dev
+- Apple Developer Forums thread 812353（visionOS の 2 台上限、2026-01）: https://developer.apple.com/forums/thread/812353
+- Apple Developer Forums thread 758064（ペアリングの上限、2024-06）: https://developer.apple.com/forums/thread/758064
+- Macworld, Bluetooth has soft limits in OS X（2016-06-07、二次情報）: https://www.macworld.com/article/228099/bluetooth-has-soft-limits-in-os-x.html
+- AOSP `system/internal_include/bt_target.h`（`GATT_MAX_PHY_CHANNEL`、`BTM_SEC_MAX_DEVICE_RECORDS`）: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/system/internal_include/bt_target.h
+- AOSP `system/stack/gatt/gatt_main.cc`（接続上限のログと失敗）: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/system/stack/gatt/gatt_main.cc
+- AOSP `system/stack/btm/btm_dev.cc`（最古の記録の追い出し）: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/system/stack/btm/btm_dev.cc
+- AOSP `BluetoothProperties.sysprop`（同時接続数のプロパティ）: https://android.googlesource.com/platform/system/libsysprop/+/refs/heads/main/srcs/android/sysprop/BluetoothProperties.sysprop
+- AOSP `system/stack/include/gatt_api.h`（`GATT_ERROR` 0x85）: https://android.googlesource.com/platform/packages/modules/Bluetooth/+/refs/heads/main/system/stack/include/gatt_api.h
+- Linux `net/bluetooth/hci_conn.c`（master）: https://github.com/torvalds/linux/blob/master/net/bluetooth/hci_conn.c
+- dotnet-bluetooth-le#838（Windows で 8 台の報告、2024-04-22、二次情報）: https://github.com/dotnet-bluetooth-le/dotnet-bluetooth-le/issues/838
+- Zebra KB 000027764（Android のペアリング上限。本文未取得、要確認）: https://support.zebra.com/article/000027764

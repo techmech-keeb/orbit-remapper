@@ -10,14 +10,19 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `e951dbc` の試験：**合格の基準をすべて満たした**（[報告](reports/m1-e951dbc-report.md)）。段階 2（[ble-connect-plan.md](../2026-09-28/ble-connect-plan.md)、許可リストでの待ち受け）は完了。PR [#13](https://github.com/techmech-keeb/orbit-remapper/pull/13) はマージできる状態。マージは利用者が判断する。
-- いま試験することはない。次の版ができたら、この §0 を書き換える。
-- 残課題（[m1-results.md](m1-results.md) §3）：
-  - Pair new device で組み直すと、ポート番号が変わる（M2 の機器台帳で直す）。
-  - ペアリングモードで鍵を消した直後の 1 回目が 5 秒待つ（次の作業でログを足して確かめる）。
-  - 古い MD600 のペアリング情報が残る（M2）。上限は 4 件。
-  - A5（BIOS）は保留。
-- 分かっていること：9 月 28 日以降の試験はすべて USB ハブ経由で、ハブ経由の問題は `1fd6c6a` 以降再現していない。PC の休止状態や再起動で M5Dial が再起動するのは、USB の電源が切れるため。
+- `2e08ac7` の短い確認（[報告](reports/m1-2e08ac7-report.md)）：`da3c37f` と同等で合格。データ長の設定は出ず、Cube Turner の電源の入れ直し 3 回は 1.6〜2.2 秒、`WARNING`・`dropping the link` 0 回。**PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16) はマージできる状態。** マージは利用者が判断する。
+- マージ前の判断（利用者）：MD600・meteorite40 で `a0d8f9e` 以降の版を試していない。回帰の恐れが小さい理由：この 2 台は自分から暗号化を始めない（`9309d56` までの流れは IST と同じで、IST は毎回 `encryption on (stored key)` が普通に届いている）。それでも短く確かめるなら、下の「MD600・meteorite40 の回帰確認」を行う。
+- いま試験することはない（回帰確認を行う場合を除く）。次の版ができたら、この §0 を書き換える。
+
+### MD600・meteorite40 の回帰確認（行う場合。版は `2e08ac7` のまま）
+
+1. Pair new device で MD600 と meteorite40 をペアリング（IST と Cube Turner はそのまま。ボンドは 4 件までなので、超えるなら Forget all devices から）。
+2. M5Dial の RST を 2 回。2 台が `(stored key)` でつながり、5 秒以内にそろうこと。
+3. 機器の電源の入れ直しを各 1 回。0.5〜1 秒でつながり直すこと。
+4. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内、`WARNING` 0 回。
+5. `encryption on` の行の末尾がどれかを報告する（何も無し／`before the connect event`／`found by polling`）。
+
+- 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、補正が働く機器、A5（BIOS）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ## 1. 結論（2026-09-27 時点）
