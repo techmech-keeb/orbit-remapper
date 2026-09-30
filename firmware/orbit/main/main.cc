@@ -306,7 +306,15 @@ static void main_loop(void* arg) {
                     orbit_ble_pair_new_device();
                 }
             }
-        } else {
+        } else if (button_down_us != 0) {
+            // Every release is logged so that a short press can be lined up
+            // with the LAT lines (2cb6aad report).
+            if (button_down_us > 0) {
+                olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(),
+                     (long long) ((esp_timer_get_time() - button_down_us) / 1000));
+            } else {
+                olog("M1 EVT t=%.3f button released after the %d ms hold\n", orbit_now_s(), BUTTON_HOLD_MS);
+            }
             button_down_us = 0;
         }
 
