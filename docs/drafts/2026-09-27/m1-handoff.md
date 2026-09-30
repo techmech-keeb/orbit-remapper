@@ -10,20 +10,27 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `2e08ac7` の短い確認（[報告](reports/m1-2e08ac7-report.md)）：`da3c37f` と同等で合格。データ長の設定は出ず、Cube Turner の電源の入れ直し 3 回は 1.6〜2.2 秒、`WARNING`・`dropping the link` 0 回。**PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16) はマージできる状態。** マージは利用者が判断する。
-- マージ前の判断（利用者）：MD600・meteorite40 で `a0d8f9e` 以降の版を試していない。回帰の恐れが小さい理由：この 2 台は自分から暗号化を始めない（`9309d56` までの流れは IST と同じで、IST は毎回 `encryption on (stored key)` が普通に届いている）。それでも短く確かめるなら、下の「MD600・meteorite40 の回帰確認」を行う。
-- いま試験することはない（回帰確認を行う場合を除く）。次の版ができたら、この §0 を書き換える。
+- PR [#16](https://github.com/techmech-keeb/orbit-remapper/pull/16) はマージ済み（`240ef5a`）。
+- 新しい版 **`66521d2`**（`orbit-m1-66521d2-ble.bin`。名前と SHA-256 は利用者が貼る）。接続の処理は `2e08ac7` と同じで、**ログを 2 つ足しただけ**。
+  1. 起動時の `M1 NVS` 行（要件 C の前半）：保存領域の使用量と、ペアリング情報 1 件の大きさ。
+  2. 機器の情報（要件 B）：ペアリングで `connecting` する行に広告の名前（`adv_name=`）と外観（`adv_appearance=`）。通知の登録の後に、機器から名前・外観・製造者・型番・PnP ID を 1 つずつ読んで `info ...` の行に出す（無い機器は `none`、読めなければ `read failed`）。記述子の行に `hash=`。
+- **試験（短い）**：
+  1. 書き込み → 起動ログの `M1 NVS` の行（3 行）をそのまま報告に写す。**`nimble_bond` の各種類の件数と 1 件のバイト数**が知りたい（`peer_sec=NxMB` など）。
+  2. 登録済みの機器（IST、Cube Turner）がつながったら、各機器の `info` の行（5 行）と `report map ... hash=` を写す。名前や型番はそのまま書いてよい（機器の製品情報なので機密ではない）。
+  3. Pair new device で 1 台だけペアリングし直し（Forget all devices はしない。4 件を超えるなら 1 台減らす）、`connecting ... adv_name=` の行を写す。
+  4. RST を 1 回。2 台が `(stored key)` でつながり 5 秒以内にそろうこと、`WARNING`・`dropping the link` が 0 回であること（回帰確認）。
+  5. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内。
+- **見てほしいこと**：`info` の読み出しが接続の直後の入力を遅らせていないか（`LAT` の最大値と、`subscribed` から最初の `LAT` までの時間）。Cube Turner は UUID が壊れている機器なので `info` が全部 `none` か `read failed` になるかもしれない（そうなったら、その旨だけ報告）。
+- 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
+- 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
-### MD600・meteorite40 の回帰確認（行う場合。版は `2e08ac7` のまま）
+### MD600・meteorite40 の回帰確認（行う場合）
 
 1. Pair new device で MD600 と meteorite40 をペアリング（IST と Cube Turner はそのまま。ボンドは 4 件までなので、超えるなら Forget all devices から）。
 2. M5Dial の RST を 2 回。2 台が `(stored key)` でつながり、5 秒以内にそろうこと。
 3. 機器の電源の入れ直しを各 1 回。0.5〜1 秒でつながり直すこと。
 4. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内、`WARNING` 0 回。
 5. `encryption on` の行の末尾がどれかを報告する（何も無し／`before the connect event`／`found by polling`）。
-
-- 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、補正が働く機器、A5（BIOS）。
-- 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ## 1. 結論（2026-09-27 時点）
 
