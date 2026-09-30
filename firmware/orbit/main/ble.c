@@ -190,7 +190,7 @@ static struct ble_npl_callout resume_co;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
-static struct ble_npl_event periodic_ev, pair_ev, clear_bonds_ev;
+static struct ble_npl_event periodic_ev, pair_ev, stop_pair_ev, clear_bonds_ev;
 static char last_event[24] = "START";
 static TaskHandle_t wake_task;
 static QueueHandle_t report_q, report_map_q, disconnect_q;
@@ -692,6 +692,27 @@ static void pair_new_device_ev(struct ble_npl_event* ev) {
     } else {
         schedule();
     }
+}
+
+static void stop_pairing_ev(struct ble_npl_event* ev) {
+    ble_addr_t peers[CONFIG_BT_NIMBLE_MAX_BONDS];
+    int n = 0;
+    ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
+    if (n == 0) {
+        olog("M1 EVT t=%.3f stop_pairing: nothing bonded, staying in pairing mode\n", now_s());
+        return;
+    }
+    olog("M1 EVT t=%.3f stop_pairing bonds=%d\n", now_s(), n);
+    peers_only = true;
+    if (scanning) {
+        int rc = ble_gap_disc_cancel();
+        if (rc != 0 && rc != BLE_HS_EALREADY) {
+            olog("M1 EVT t=%.3f scan cancel failed rc=0x%x\n", now_s(), rc);
+            return;
+        }
+        scanning = false;
+    }
+    schedule();
 }
 
 static void clear_bonds_on_host(struct ble_npl_event* ev) {
@@ -1631,6 +1652,7 @@ void orbit_ble_start(TaskHandle_t wake) {
     ble_store_config_init();
     ble_npl_event_init(&periodic_ev, periodic_check, NULL);
     ble_npl_event_init(&pair_ev, pair_new_device_ev, NULL);
+    ble_npl_event_init(&stop_pair_ev, stop_pairing_ev, NULL);
     ble_npl_event_init(&clear_bonds_ev, clear_bonds_on_host, NULL);
     ble_npl_callout_init(&resume_co, nimble_port_get_dflt_eventq(), resume, NULL);
     nimble_port_freertos_init(host_task);
@@ -1667,6 +1689,10 @@ void orbit_ble_pair_new_device(void) {
 
 void orbit_ble_clear_bonds(void) {
     ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &clear_bonds_ev);
+}
+
+void orbit_ble_stop_pairing(void) {
+    ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &stop_pair_ev);
 }
 
 void orbit_ble_take_stats(int i, orbit_dev_stats_t* out) {

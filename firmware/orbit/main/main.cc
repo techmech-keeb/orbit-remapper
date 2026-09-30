@@ -37,6 +37,7 @@
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
 #define PIN_BUTTON     42 // screen push button, low when pressed
+#define BUTTON_HOLD_MS 2000 // held this long: pairing mode on/off (G-5)
 
 // Decision I3: keep a buffer for LVGL (M3) allocated from the start, so the
 // free-memory numbers measured in M1 already account for it.
@@ -286,6 +287,37 @@ static void main_loop(void* arg) {
         if (our_descriptor->main_loop_task != nullptr) {
             our_descriptor->main_loop_task();
         }
+        // Holding the button 2 s toggles pairing mode, once per hold (G-5).
+        // The loop runs on every report as well as every tick, so measure by
+        // the clock, not by iterations.
+        static int64_t button_down_us; // 0: released, -1: this hold is spent
+        if (gpio_get_level((gpio_num_t) PIN_BUTTON) == 0) {
+            int64_t now = esp_timer_get_time();
+            if (button_down_us == 0) {
+                button_down_us = now;
+            } else if (button_down_us > 0 && now - button_down_us >= BUTTON_HOLD_MS * 1000) {
+                button_down_us = -1;
+                bool pairing = orbit_ble_pairing();
+                olog("M1 EVT t=%.3f button held %d ms: %s\n", orbit_now_s(), BUTTON_HOLD_MS,
+                     pairing ? "stop pairing" : "pair new device");
+                if (pairing) {
+                    orbit_ble_stop_pairing();
+                } else {
+                    orbit_ble_pair_new_device();
+                }
+            }
+        } else if (button_down_us != 0) {
+            // Every release is logged so that a short press can be lined up
+            // with the LAT lines (2cb6aad report).
+            if (button_down_us > 0) {
+                olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(),
+                     (long long) ((esp_timer_get_time() - button_down_us) / 1000));
+            } else {
+                olog("M1 EVT t=%.3f button released after the %d ms hold\n", orbit_now_s(), BUTTON_HOLD_MS);
+            }
+            button_down_us = 0;
+        }
+
         if (need_to_persist_config) {
             int64_t t0 = esp_timer_get_time();
             persist_config_return_code = persist_config();

@@ -72,6 +72,9 @@ void orbit_ble_poll(void);
 // Config-tool commands (called from the core through platform.h; see platform.cc).
 void orbit_ble_pair_new_device(void);
 void orbit_ble_clear_bonds(void);
+// Back to bonded devices only, without waiting for a pairing (button, G-5).
+// Stays in pairing mode when nothing is bonded, as there is nothing to wait for.
+void orbit_ble_stop_pairing(void);
 
 // Copies device slot i and starts a new report window for it.
 void orbit_ble_take_stats(int i, orbit_dev_stats_t* out);
