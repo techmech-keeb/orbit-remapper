@@ -241,6 +241,7 @@ static void main_loop(void* arg) {
         tud_task_ext(0, false);
         orbit_log_pump();
         orbit_commands_poll();
+        orbit_ledger_flush(false, lat_last_rx_us);
 
         // From the BLE task (decision I2: only this task calls the core).
         orbit_disconnect_t disc;
@@ -345,6 +346,7 @@ static void main_loop(void* arg) {
             }
             tud_disconnect();
             vTaskDelay(pdMS_TO_TICKS(100));
+            orbit_ledger_flush(true, 0);
             orbit_enter_download_mode();
         }
     }

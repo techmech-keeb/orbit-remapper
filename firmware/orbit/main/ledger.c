@@ -33,8 +33,37 @@ static void unlock(void) {
     xSemaphoreGive(mutex);
 }
 
+// Writes are deferred: a flash write stalls every task for its duration
+// (the cache is off meanwhile), and the ledger changes right when a device
+// connects, i.e. when input starts. 747c13d report: one 8-9 ms input delay
+// per save. So a change only marks the table dirty; orbit_ledger_flush()
+// writes it once the input has paused, or after LEDGER_FLUSH_MAX_US at the
+// latest, and the several changes of one connection become one write.
+#define LEDGER_FLUSH_IDLE_US (1 * 1000000)
+#define LEDGER_FLUSH_MAX_US (10 * 1000000)
+
+static volatile bool dirty;
+static int64_t dirty_since_us;
+static const char* dirty_why;
+
 // Called with the lock held.
-static void save(void) {
+static void mark(const char* why) {
+    if (!dirty) {
+        dirty_since_us = esp_timer_get_time();
+        dirty_why = why;
+    }
+    dirty = true;
+}
+
+void orbit_ledger_flush(bool force, int64_t last_input_us) {
+    if (!dirty) {
+        return;
+    }
+    int64_t now = esp_timer_get_time();
+    if (!force && now - last_input_us < LEDGER_FLUSH_IDLE_US && now - dirty_since_us < LEDGER_FLUSH_MAX_US) {
+        return;
+    }
+    lock();
     nvs_handle_t h;
     esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
     if (err == ESP_OK) {
@@ -47,8 +76,14 @@ static void save(void) {
         }
         nvs_close(h);
     }
+    const char* why = dirty_why;
+    dirty = false;
+    unlock();
     if (err != ESP_OK) {
         olog("M1 EVT t=%.3f ledger save failed err=0x%x\n", now_s(), err);
+    } else {
+        olog("M1 EVT t=%.3f ledger saved (%u B, %.1f ms, why=%s%s)\n", now_s(), (unsigned) sizeof(rows),
+             (esp_timer_get_time() - now) / 1000.0, why, force ? ", forced" : "");
     }
 }
 
@@ -144,7 +179,7 @@ int orbit_ledger_add(const ble_addr_t* addr, bool is_new) {
         r->addr = *addr;
         r->last_used = boots;
         r->flags = is_new ? ORBIT_LEDGER_NEW : 0;
-        save();
+        mark("add");
     }
     unlock();
     return port;
@@ -212,7 +247,7 @@ void orbit_ledger_sync_bonds(const ble_addr_t* bonded, int n) {
     }
     if (changed) {
         lock();
-        save();
+        mark("sync_bonds");
         unlock();
     }
 }
@@ -222,7 +257,7 @@ void orbit_ledger_touch(int port) {
     orbit_ledger_row_t* r = row_of_port(port);
     if (r != NULL && r->last_used != boots) {
         r->last_used = boots;
-        save();
+        mark("touch");
     }
     unlock();
 }
@@ -234,7 +269,7 @@ void orbit_ledger_set_key(int port, bool has_key) {
         uint8_t flags = has_key ? (r->flags & ~ORBIT_LEDGER_NO_KEY) : (r->flags | ORBIT_LEDGER_NO_KEY);
         if (flags != r->flags) {
             r->flags = flags;
-            save();
+            mark("set_key");
         }
     }
     unlock();
@@ -266,7 +301,7 @@ void orbit_ledger_set_text(int port, const char* name, const char* manufacturer,
         set_field(r->manufacturer, manufacturer);
         set_field(r->model, model);
         if (memcmp(&before, r, sizeof(*r)) != 0) {
-            save();
+            mark("set_text");
         }
     }
     unlock();
@@ -279,7 +314,7 @@ void orbit_ledger_set_ids(int port, uint16_t vid, uint16_t pid, uint16_t appeara
         r->vid = vid;
         r->pid = pid;
         r->appearance = appearance;
-        save();
+        mark("set_ids");
     }
     unlock();
 }
@@ -290,7 +325,7 @@ void orbit_ledger_set_map(int port, uint32_t hash, uint8_t kind) {
     if (r != NULL && (r->map_hash != hash || r->kind != kind)) {
         r->map_hash = hash;
         r->kind = kind;
-        save();
+        mark("set_map");
     }
     unlock();
 }
@@ -300,7 +335,7 @@ bool orbit_ledger_set_alias(int port, const char* alias) {
     orbit_ledger_row_t* r = row_of_port(port);
     if (r != NULL) {
         set_field(r->alias, alias);
-        save();
+        mark("set_alias");
     }
     unlock();
     return r != NULL;
@@ -320,9 +355,10 @@ bool orbit_ledger_forget(int port) {
     orbit_ledger_row_t* r = row_of_port(port);
     if (r != NULL) {
         memset(r, 0, sizeof(*r));
-        save();
+        mark("forget");
     }
     unlock();
+    orbit_ledger_flush(true, 0); // the bond goes with it; keep the two in step
     return r != NULL;
 }
 
@@ -338,9 +374,10 @@ bool orbit_ledger_move(int new_port, int old_port) {
         memset(o, 0, sizeof(*o));
         n->port = old_port;
         n->flags &= ~ORBIT_LEDGER_NEW;
-        save();
+        mark("move");
     }
     unlock();
+    orbit_ledger_flush(true, 0);
     return ok;
 }
 

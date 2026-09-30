@@ -46,6 +46,11 @@ typedef struct {
 } orbit_ledger_row_t;
 
 void orbit_ledger_init(void);
+// Writes the table to NVS when it changed. Changes are only marked; call
+// this from the main loop with the time of the last input, and it writes
+// once the input has paused for 1 s (or 10 s after the change). force
+// writes now (before a reboot).
+void orbit_ledger_flush(bool force, int64_t last_input_us);
 
 // Port of addr, or 0 when unknown.
 int orbit_ledger_port(const ble_addr_t* addr);
