@@ -64,6 +64,12 @@ void orbit_ledger_flush(bool force, int64_t last_input_us) {
         return;
     }
     lock();
+    if (!dirty) {
+        // Another task wrote it while we waited for the lock (2b27551
+        // report: forget wrote twice, from the command and the main loop).
+        unlock();
+        return;
+    }
     nvs_handle_t h;
     esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
     if (err == ESP_OK) {

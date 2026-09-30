@@ -71,8 +71,14 @@ static struct {
     uint32_t max_us;
 } lat;
 
+// When input last arrived, for deferring flash writes. Separate from the LAT
+// reference, which orbit_report_sent() clears once a report went out (2b27551
+// report: the ledger was written at once because that read as 0).
+static int64_t last_input_us;
+
 static void lat_note_received(int64_t t_us) {
     lat_last_rx_us = t_us;
+    last_input_us = t_us;
 }
 
 void orbit_report_sent() {
@@ -241,7 +247,7 @@ static void main_loop(void* arg) {
         tud_task_ext(0, false);
         orbit_log_pump();
         orbit_commands_poll();
-        orbit_ledger_flush(false, lat_last_rx_us);
+        orbit_ledger_flush(false, last_input_us);
 
         // From the BLE task (decision I2: only this task calls the core).
         orbit_disconnect_t disc;
