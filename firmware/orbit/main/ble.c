@@ -69,6 +69,11 @@
 
 #define REPORT_QUEUE_LEN 32
 
+// Pairing mode ends by itself after this (upstream waits forever; a forgotten
+// Pair new device would keep accepting anyone). Not while nothing is bonded:
+// then there is nothing else to wait for.
+#define PAIRING_TIMEOUT_US (120 * 1000000)
+
 // A device whose encryption failed (it still holds keys from an earlier
 // pairing) reconnects at once and fails again: 280 attempts in 2 minutes,
 // crowding out other devices (09b3075 report). After MAX_FAILS such
@@ -198,7 +203,16 @@ static struct ble_npl_callout resume_co;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
-static struct ble_npl_event periodic_ev, pair_ev, stop_pair_ev, clear_bonds_ev;
+static struct ble_npl_event periodic_ev, pair_ev, stop_pair_ev, clear_bonds_ev, cmd_ev;
+static int64_t pairing_since_us; // start of the current pairing mode (0: not pairing)
+static bool bonds_full_seen;     // a pairing was refused because the ledger is full (cleared by forget)
+
+// Ledger commands from other tasks (config tool, serial), run on the host task.
+typedef struct {
+    enum { CMD_FORGET, CMD_MOVE } kind;
+    int a, b;
+} cmd_t;
+static QueueHandle_t cmd_q;
 static char last_event[24] = "START";
 static bool duplicates_seen; // two or more ledger rows look like one device (info_done)
 static TaskHandle_t wake_task;
@@ -267,6 +281,7 @@ static void start_discovery(dev_t* d);
 static void schedule(void);
 static bool is_bonded(const ble_addr_t* addr);
 static int ensure_row(dev_t* d);
+static void stop_pairing_ev(struct ble_npl_event* ev);
 
 static double now_s(void) {
     return esp_timer_get_time() / 1e6;
@@ -426,6 +441,7 @@ static void on_encrypted(dev_t* d, const char* when) {
     }
     d->key_tag = now_tag;
     peers_only = true; // as upstream: back to bonded devices only after a successful pairing
+    pairing_since_us = 0;
     int port = ensure_row(d);
     if (port != 0) {
         orbit_ledger_touch(port);
@@ -622,6 +638,13 @@ static void periodic_check(struct ble_npl_event* ev) {
         connecting_cancel_logged = true;
     }
 
+    if (!peers_only && pairing_since_us != 0 && now - pairing_since_us > PAIRING_TIMEOUT_US &&
+        orbit_ledger_count() > 0) {
+        olog("M1 EVT t=%.3f pairing mode ended after %d s without a new device\n", now_s(),
+             (int) (PAIRING_TIMEOUT_US / 1000000));
+        stop_pairing_ev(NULL);
+    }
+
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
         if (d->connected && d->sec_pending) {
@@ -717,8 +740,17 @@ static void periodic_check(struct ble_npl_event* ev) {
 }
 
 static void pair_new_device_ev(struct ble_npl_event* ev) {
+    if (orbit_ledger_full()) {
+        // J1: never overwrite a bond silently; the user forgets one first.
+        olog("M1 EVT t=%.3f pair_new_device refused: ledger full (%d devices), forget one first\n", now_s(),
+             ORBIT_LEDGER_MAX);
+        bonds_full_seen = true;
+        set_last_event("FULL", 0, -1);
+        return;
+    }
     olog("M1 EVT t=%.3f pair_new_device\n", now_s());
     peers_only = false;
+    pairing_since_us = esp_timer_get_time();
     if (wl_waiting) {
         ble_gap_conn_cancel(); // the connect event that follows leads to schedule()
     } else {
@@ -736,6 +768,7 @@ static void stop_pairing_ev(struct ble_npl_event* ev) {
     }
     olog("M1 EVT t=%.3f stop_pairing bonds=%d\n", now_s(), n);
     peers_only = true;
+    pairing_since_us = 0;
     if (scanning) {
         int rc = ble_gap_disc_cancel();
         if (rc != 0 && rc != BLE_HS_EALREADY) {
@@ -750,6 +783,12 @@ static void stop_pairing_ev(struct ble_npl_event* ev) {
 static void clear_bonds_on_host(struct ble_npl_event* ev) {
     int rc = ble_store_clear();
     olog("M1 EVT t=%.3f clear_bonds rc=0x%x\n", now_s(), rc);
+    orbit_ledger_row_t row;
+    while (orbit_ledger_nth(0, &row)) {
+        orbit_ledger_forget(row.port);
+    }
+    bonds_full_seen = false;
+    pairing_since_us = esp_timer_get_time();
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         if (devs[i].connected) {
             ble_gap_terminate(devs[i].conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -763,6 +802,63 @@ static void clear_bonds_on_host(struct ble_npl_event* ev) {
 
 static bool is_bonded(const ble_addr_t* addr) {
     return bond_index(addr) != 0;
+}
+
+static void drop_links_of(const ble_addr_t* addr, const char* why) {
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        if (devs[i].connected && ble_addr_cmp(&devs[i].addr, addr) == 0) {
+            EVT(&devs[i], "%s, dropping the link", why);
+            ble_gap_terminate(devs[i].conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+        }
+    }
+}
+
+// The accept list is built from the bond list at the start of each round;
+// end the current round so that the next one sees the change.
+static void restart_wait(void) {
+    if (wl_waiting) {
+        ble_gap_conn_cancel(); // the connect event that follows leads to schedule()
+    } else {
+        schedule();
+    }
+}
+
+static void run_commands(struct ble_npl_event* ev) {
+    cmd_t c;
+    while (xQueueReceive(cmd_q, &c, 0) == pdTRUE) {
+        orbit_ledger_row_t row, old;
+        switch (c.kind) {
+        case CMD_FORGET:
+            if (!orbit_ledger_get(c.a, &row)) {
+                olog("M1 EVT t=%.3f forget: no port %d\n", now_s(), c.a);
+                break;
+            }
+            olog("M1 EVT t=%.3f forget port %d addr=..:%02x:%02x\n", now_s(), c.a, row.addr.val[1], row.addr.val[0]);
+            drop_links_of(&row.addr, "forgotten");
+            ble_store_util_delete_peer(&row.addr);
+            orbit_ledger_forget(c.a);
+            fail_clear(&row.addr);
+            bonds_full_seen = false;
+            restart_wait();
+            break;
+        case CMD_MOVE:
+            // The new device (port a) becomes port b; b's row and bond go.
+            if (!orbit_ledger_get(c.a, &row) || !orbit_ledger_get(c.b, &old) || c.a == c.b) {
+                olog("M1 EVT t=%.3f move: ports %d -> %d not valid\n", now_s(), c.a, c.b);
+                break;
+            }
+            olog("M1 EVT t=%.3f move: port %d addr=..:%02x:%02x takes over port %d addr=..:%02x:%02x\n", now_s(), c.a,
+                 row.addr.val[1], row.addr.val[0], c.b, old.addr.val[1], old.addr.val[0]);
+            drop_links_of(&old.addr, "replaced");
+            ble_store_util_delete_peer(&old.addr);
+            orbit_ledger_move(c.a, c.b);
+            // The core learned port a with the report map; it hears the new
+            // number when the device reconnects.
+            drop_links_of(&row.addr, "port changed");
+            restart_wait();
+            break;
+        }
+    }
 }
 
 // Device names are shown and logged as they come, so anything outside
@@ -786,6 +882,15 @@ static bool is_candidate(const struct ble_gap_disc_desc* disc) {
         return true;
     }
     if (peers_only) {
+        return false;
+    }
+    if (orbit_ledger_full()) {
+        if (!bonds_full_seen) {
+            olog("M1 EVT t=%.3f ledger full (%d devices): not connecting new devices, forget one first\n", now_s(),
+                 ORBIT_LEDGER_MAX);
+            bonds_full_seen = true;
+            set_last_event("FULL", 0, -1);
+        }
         return false;
     }
     struct ble_hs_adv_fields fields;
@@ -1710,6 +1815,7 @@ static void on_sync(void) {
     int n = 0;
     ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
     peers_only = n > 0; // nothing bonded yet: accept any HID device, as upstream
+    pairing_since_us = peers_only ? 0 : esp_timer_get_time();
     olog("M1 EVT t=%.3f ble ready bonds=%d\n", now_s(), n);
     for (int i = 0; i < n; i++) {
         olog("M1 EVT t=%.3f bond %d addr=..:%02x:%02x kind=%s\n", now_s(), i + 1, peers[i].val[1], peers[i].val[0],
@@ -1770,6 +1876,8 @@ void orbit_ble_start(TaskHandle_t wake) {
     ble_npl_event_init(&pair_ev, pair_new_device_ev, NULL);
     ble_npl_event_init(&stop_pair_ev, stop_pairing_ev, NULL);
     ble_npl_event_init(&clear_bonds_ev, clear_bonds_on_host, NULL);
+    ble_npl_event_init(&cmd_ev, run_commands, NULL);
+    cmd_q = xQueueCreate(8, sizeof(cmd_t));
     ble_npl_callout_init(&resume_co, nimble_port_get_dflt_eventq(), resume, NULL);
     nimble_port_freertos_init(host_task);
 }
@@ -1809,6 +1917,35 @@ void orbit_ble_clear_bonds(void) {
 
 void orbit_ble_stop_pairing(void) {
     ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &stop_pair_ev);
+}
+
+static void post_command(cmd_t c) {
+    if (xQueueSend(cmd_q, &c, 0) == pdTRUE) {
+        ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &cmd_ev);
+    }
+}
+
+void orbit_ble_forget(int port) {
+    post_command((cmd_t) { .kind = CMD_FORGET, .a = port });
+}
+
+void orbit_ble_move(int new_port, int old_port) {
+    post_command((cmd_t) { .kind = CMD_MOVE, .a = new_port, .b = old_port });
+}
+
+bool orbit_ble_bonds_full(void) {
+    return bonds_full_seen;
+}
+
+int orbit_ble_pairing_remaining_s(void) {
+    if (peers_only) {
+        return 0;
+    }
+    if (pairing_since_us == 0 || orbit_ledger_count() == 0) {
+        return -1; // no end
+    }
+    int64_t left = PAIRING_TIMEOUT_US - (esp_timer_get_time() - pairing_since_us);
+    return left > 0 ? (int) (left / 1000000) : 0;
 }
 
 void orbit_ble_take_stats(int i, orbit_dev_stats_t* out) {

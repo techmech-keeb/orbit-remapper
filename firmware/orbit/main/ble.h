@@ -75,6 +75,11 @@ void orbit_ble_clear_bonds(void);
 // Back to bonded devices only, without waiting for a pairing (button, G-5).
 // Stays in pairing mode when nothing is bonded, as there is nothing to wait for.
 void orbit_ble_stop_pairing(void);
+// Ledger management (M2 2a). Run on the host task; safe from any task.
+void orbit_ble_forget(int port);              // drop the device's bond, row and link
+void orbit_ble_move(int new_port, int old_port); // the device on new_port takes over old_port
+bool orbit_ble_bonds_full(void);              // a pairing was refused because all 15 ports are taken
+int orbit_ble_pairing_remaining_s(void);      // seconds left in pairing mode; 0 when not pairing, -1 when open-ended
 
 // Copies device slot i and starts a new report window for it.
 void orbit_ble_take_stats(int i, orbit_dev_stats_t* out);
