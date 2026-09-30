@@ -625,6 +625,23 @@ static void periodic_check(struct ble_npl_event* ev) {
     // an unencrypted link is of no use anyway.
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
+        // NimBLE does not always post ENC_CHANGE: when the device's own
+        // Security Request and our request overlap, the link ends up
+        // encrypted (the controller only encrypts with the key we hold for
+        // that address) and no event reaches us (9309d56 report: four
+        // links dropped for "no answer" with enc=1). So look at the link
+        // ourselves once a second while waiting.
+        if (d->connected && !d->encrypted && !d->sec_pending) {
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(d->conn_handle, &desc) == 0) {
+                EVT(d, "waiting for encryption: enc=%u bonded=%u key_size=%u", desc.sec_state.encrypted,
+                    desc.sec_state.bonded, desc.sec_state.key_size);
+                if (desc.sec_state.encrypted) {
+                    on_encrypted(d, ", noticed by polling");
+                    continue;
+                }
+            }
+        }
         // Counted from our own request, not from the connect event: while
         // another device's procedure keeps NimBLE busy (rc=0x6) this device
         // has not been asked anything yet (ff8e166 report, problem 2).
@@ -1354,7 +1371,16 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             return 0;
         }
         if (d->encrypted) {
-            EVT(d, "encryption changed again (key refresh)");
+            // A second event on an accepted link: a key refresh, or the
+            // end of a pairing that ran on after we accepted the link.
+            uint32_t now_tag = key_tag(&d->addr);
+            if (now_tag != d->key_tag && peers_only) {
+                EVT(d, "WARNING: key replaced outside pairing mode");
+                give_up_on(d, "key replaced outside pairing mode", 0);
+                return 0;
+            }
+            EVT(d, "encryption changed again (%s)", now_tag == d->key_tag ? "same key" : "new key, pairing mode");
+            d->key_tag = now_tag;
             return 0;
         }
         on_encrypted(d, "");
