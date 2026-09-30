@@ -10,8 +10,8 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- `2cb6aad` の試験（[報告](reports/m1-2cb6aad-report.md)）：合格。**PR [#24](https://github.com/techmech-keeb/orbit-remapper/pull/24) はマージできる状態。** マージは利用者が判断する。報告の提案どおり、離したときのログ `button released after N ms` を `fb7b88f` で足した（PR #24 に同梱、未試験。次の版で確かめる）。
-- いま試験することはない（MD600・meteorite40 の回帰確認を行う場合を除く）。次の版ができたら、この §0 を書き換える。
+- PR [#24](https://github.com/techmech-keeb/orbit-remapper/pull/24) はマージ済み（`8fdeb32`）。M1 の残りは A5（BIOS）と任意の回帰確認だけ。**次は M2**（依頼書 [m2-brief.md](../2026-09-30/m2-brief.md)）。M2 の版ができたら、この §0 を書き換える。
+- いま試験することはない（MD600・meteorite40 の回帰確認を行う場合を除く）。`fb7b88f` の `button released after N ms` は M2 の最初の版で確かめる。
 - 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
