@@ -815,21 +815,32 @@ static void periodic_check(struct ble_npl_event* ev) {
                     // that key has been used (security elevation), or on
                     // REPEAT_PAIRING, which we refuse. So accept it when the
                     // address is bonded and the stored key is unchanged.
-                    if (!is_bonded(&d->addr) || key_tag(&d->addr) != d->key_tag) {
-                        if (peers_only && !approved_for(&d->addr)) {
+                    uint32_t now_tag = key_tag(&d->addr);
+                    bool may_pair = !peers_only || approved_for(&d->addr);
+                    if (!is_bonded(&d->addr) || now_tag == 0) {
+                        // Encrypted, but no key stored yet: a pairing is
+                        // still running (the keys come last). Accepting it
+                        // here ended pairing mode early, and the keys
+                        // stored a moment later then read as "replaced
+                        // outside pairing mode" (230e758 and 302af13
+                        // reports). Wait for its ENC_CHANGE, or for the
+                        // keys to appear here.
+                        if (!may_pair) {
                             ask_approval(d, "device paired with a new key");
-                            give_up_on(d, "encrypted link with no bond or a changed key outside pairing mode", 0);
+                            give_up_on(d, "encrypted link with no bond outside pairing mode", 0);
                         }
-                        // Pairing mode (or approved): a pairing is still
-                        // running; the link is encrypted with a key that
-                        // is not stored yet. Accepting it here ended
-                        // pairing mode early, and the keys that arrived a
-                        // moment later then read as "replaced outside
-                        // pairing mode" (230e758 report). Its own events
-                        // (ENC_CHANGE, PARING_COMPLETE) accept it.
                         continue;
                     }
-                    on_encrypted(d, ", found by polling (NimBLE posted no event)");
+                    if (now_tag != d->key_tag && !(may_pair && d->key_tag == 0)) {
+                        // The key changed under us: only a new pairing does that.
+                        if (!may_pair) {
+                            ask_approval(d, "device paired with a new key");
+                            give_up_on(d, "encrypted link with a changed key outside pairing mode", 0);
+                        }
+                        continue;
+                    }
+                    on_encrypted(d, d->key_tag == 0 ? ", new pairing found by polling (NimBLE posted no event)"
+                                                    : ", found by polling (NimBLE posted no event)");
                     continue;
                 }
             }
@@ -1815,14 +1826,10 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // Posted for a stored-key encryption too, not only for a pairing.
             EVT(d, "security done status=0x%x", event->pairing_complete.status);
             log_security(d, "after security");
-            struct ble_gap_conn_desc desc;
-            if (event->pairing_complete.status == 0 && !d->encrypted && ble_gap_conn_find(d->conn_handle, &desc) == 0 &&
-                desc.sec_state.encrypted) {
-                // A pairing whose ENC_CHANGE never reached us; the keys are
-                // stored now, so this is the point to accept the link.
-                d->sec_pending = false;
-                on_encrypted(d, ", at pairing complete (no ENC_CHANGE event)");
-            }
+            // Not the point to accept a new pairing: NimBLE posts this
+            // before it stores the keys (302af13 report: "no stored peer
+            // keys" right here, and accepting ended pairing mode so that
+            // the keys stored a moment later read as a replacement).
         }
         return 0;
 
@@ -1873,6 +1880,13 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // A second event on an accepted link: a key refresh, or the
             // end of a pairing that ran on after we accepted the link.
             uint32_t now_tag = key_tag(&d->addr);
+            if (d->key_tag == 0 && now_tag != 0) {
+                // The link was accepted before its keys were stored (a new
+                // pairing); this is the first key on it, not a replacement.
+                EVT(d, "keys stored for this new pairing");
+                d->key_tag = now_tag;
+                return 0;
+            }
             if (now_tag != d->key_tag && peers_only && !approved_for(&d->addr)) {
                 EVT(d, "WARNING: key replaced outside pairing mode");
                 ask_approval(d, "device paired with a new key");
