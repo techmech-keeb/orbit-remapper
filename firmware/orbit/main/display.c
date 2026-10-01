@@ -105,6 +105,11 @@ esp_lcd_panel_io_handle_t display_io(void)
     return panel_io;
 }
 
+void display_backlight(bool on)
+{
+    gpio_set_level(PIN_BL, on ? 1 : 0);
+}
+
 static void draw_band(int y0, int h, const display_line_t *line)
 {
     xSemaphoreTake(band_free, portMAX_DELAY);
