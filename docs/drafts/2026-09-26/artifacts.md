@@ -15,7 +15,7 @@ finalized: false
 | 区分 | 置き場所 | 対象 |
 | --- | --- | --- |
 | 公開できる物 | このリポジトリ | 設計経緯の文書、CAD の生成コード、STEP、PCB 外形 DXF、部品配置 CSV、検査記録、自作のコンセプト画像 |
-| 非公開の原本 | private の `techmech-keeb/keyboard-hardware` の `products/orbit-remapper/archive/2026-09-26/` | 元 BOM（価格・入手先を含む）と CSV 書き出し、Claude 引き継ぎ文書（md / docx）、設計レビュー PDF（2種） |
+| 非公開の原本 | 非公開の保管先（別の private リポジトリ） | 元 BOM（価格・入手先を含む）と CSV 書き出し、Claude 引き継ぎ文書（md / docx）、設計レビュー PDF（2種） |
 | 生成物 | Release に添付する予定（未作成） | 試作候補 STL、描画 PNG、3D ビューア HTML、プレビュー PNG |
 | 保存しない物 | 出典のリンクだけを残す | M5Stack の製品写真・寸法図、IPAex フォント、分割 ZIP |
 
@@ -26,7 +26,7 @@ Release はまだ作っていません。それまで生成物と分割 ZIP は�
 | `location` | 意味 |
 | --- | --- |
 | `orbit-remapper` | このリポジトリの同じパスにある |
-| `keyboard-hardware` | `private_path` に移した |
+| `private-archive` | 非公開の保管先（別の private リポジトリ）へ移した |
 | `release-pending` | 生成物。Release への添付待ち |
 | `not-stored` | 保存しない（第三者の素材、または重複） |
 
@@ -44,9 +44,9 @@ Release はまだ作っていません。それまで生成物と分割 ZIP は�
 
 ## 保存時の確認（当初の格納時）
 
-原本7点とZIP内の全ファイルを保存し、SHA-256一覧に対応付けました。単独配布PDFとZIP内PDFはバイナリが異なりますが、抽出した本文は一致しました。どちらも原本として keyboard-hardware 側に保存しています。
+原本7点とZIP内の全ファイルを保存し、SHA-256一覧に対応付けました。単独配布PDFとZIP内PDFはバイナリが異なりますが、抽出した本文は一致しました。どちらも原本として非公開の保管先（別の private リポジトリ）に保存しています。
 
-元BOMの各シートはCSVに書き出しました。表の値・数式の参照用で、元XLSXが正本です。どちらも keyboard-hardware 側にあります。
+元BOMの各シートはCSVに書き出しました。表の値・数式の参照用で、元XLSXが正本です。どちらも非公開の保管先（別の private リポジトリ）にあります。
 
 ## 再生成時の注意
 

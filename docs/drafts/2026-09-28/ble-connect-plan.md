@@ -17,7 +17,7 @@ finalized: false
 
 ## 2. 段階
 
-### 段階 0：この記録（PR [techmech-keeb/orbit-remapper#11](https://github.com/techmech-keeb/orbit-remapper/pull/11) に同梱）
+### 段階 0：この記録（PR techmech-keeb/orbit-remapper#11（マージ `d6ef112`） に同梱）
 
 調査と計画の文書だけ。コードは変えない。
 
@@ -95,7 +95,7 @@ finalized: false
 
 | PR | 中身 | マージの時機 |
 | --- | --- | --- |
-| [techmech-keeb/orbit-remapper#11](https://github.com/techmech-keeb/orbit-remapper/pull/11) | 問題 G の直し（実機で確認済み）、G' の見張り `eb9a5af`（未確認）、この調査と計画 | **今マージしてよい。** G の直しは `a195bc8` の試験で効いた。`eb9a5af` は、5 秒止まった探索の接続を切るだけで、その接続はもともと 30 秒使えなかった。悪化する経路は小さく、段階 1 の版でまとめて確かめられる |
+| techmech-keeb/orbit-remapper#11（マージ `d6ef112`） | 問題 G の直し（実機で確認済み）、G' の見張り `eb9a5af`（未確認）、この調査と計画 | **今マージしてよい。** G の直しは `a195bc8` の試験で効いた。`eb9a5af` は、5 秒止まった探索の接続を切るだけで、その接続はもともと 30 秒使えなかった。悪化する経路は小さく、段階 1 の版でまとめて確かめられる |
 | 段階 1 の PR | §2 段階 1 | ローカルのセッションの試験で合格したら |
 | 段階 2 の PR | §2 段階 2 | 同上 |
 | 段階 3 の PR | §2 段階 3 | 同上 |

@@ -18,8 +18,7 @@
    "kind": "original",
    "bytes": 14194,
    "sha256": "316a51947fdc950b5fd773e8b487c9e515602101a4b7f8453f044d27395c27a2",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_bom_v0.3.xlsx"
+   "location": "private-archive"
   },
   {
    "path": "artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.docx",
@@ -27,8 +26,7 @@
    "kind": "original",
    "bytes": 2170702,
    "sha256": "8728b2e6eb485ee05000ed82fe9339fa9e09deafd8fc7feb891ee0cdca980e53",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_claude_handoff.docx"
+   "location": "private-archive"
   },
   {
    "path": "artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.md",
@@ -36,8 +34,7 @@
    "kind": "original",
    "bytes": 33251,
    "sha256": "7bfe861dabfedae0fb4c1a52688e419156fe47728a698513fcce967ea1941a9c",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_claude_handoff.md"
+   "location": "private-archive"
   },
   {
    "source_name": "remapper_design.zip",
@@ -67,8 +64,7 @@
    "kind": "original",
    "bytes": 1088152,
    "sha256": "2a99232d3e96b72cdc690fa4fe4095352b14efc39808accf65dab7244d58dd01",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/originals/remapper_design_review.pdf"
+   "location": "private-archive"
   },
   {
    "path": "artifacts/drafts/2026-09-26/originals/remapper_preview.png",
@@ -485,8 +481,7 @@
    "kind": "extracted-original",
    "bytes": 1063177,
    "sha256": "6c6b40da320407fd2445f15b2c8a23d01da2c3a7bf2497f110e70ccc2c5b3ef5",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/e1-v0.3/remapper_design_review.pdf"
+   "location": "private-archive"
   },
   {
    "path": "artifacts/drafts/2026-09-26/e1-v0.3/stl_cleanup.json",
@@ -513,22 +508,19 @@
    "path": "artifacts/drafts/2026-09-26/bom-reference/sheet-01.csv",
    "bytes": 4922,
    "sha256": "a2755944e018919e6962f278ef6e271e52735ef719f48d81992d35b8e4d9024c",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/bom-reference/sheet-01.csv"
+   "location": "private-archive"
   },
   {
    "sheet": "変更履歴",
    "path": "artifacts/drafts/2026-09-26/bom-reference/sheet-02.csv",
    "bytes": 1015,
    "sha256": "10e003e73680a8bcb5ee9d167924f7ccbb21b471fc0ea7d93e8f95fd14718451",
-   "location": "keyboard-hardware",
-   "private_path": "products/orbit-remapper/archive/2026-09-26/bom-reference/sheet-02.csv"
+   "location": "private-archive"
   }
  ],
  "relocated": {
   "date": "2026-09-26",
-  "reason": "将来の OSS 公開に備え、公開できる物だけを orbit-remapper に残した。非公開の原本は private の keyboard-hardware へ移した。",
-  "private_repository": "techmech-keeb/keyboard-hardware",
+  "reason": "将来の OSS 公開に備え、公開できる物だけを orbit-remapper に残した。非公開の原本は別の private リポジトリへ移した。",
   "original_branch": "docs/draft-design-record-20260926"
  }
 }

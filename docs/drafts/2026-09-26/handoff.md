@@ -22,7 +22,7 @@ finalized: false
 | リポジトリ | 状態 |
 | --- | --- |
 | `techmech-keeb/orbit-remapper`（private、将来 OSS 公開前提） | `main` に PR #2・#4 がマージ済み。**PR #5（ブランチ `claude/gifted-pascal-husnvk`）が未マージ**で、構成の見直し・調査・この引き継ぎ文書を含む。Issue #3（E1 生成物の Release 作成）が未着手 |
-| `techmech-keeb/keyboard-hardware`（private） | PR #23 マージ済み。`products/orbit-remapper/archive/2026-09-26/` に公開しない原本（元 BOM、Claude 引き継ぎ文書、設計レビュー PDF）を保管 |
+| 非公開の保管先（別の private リポジトリ） | 公開しない原本（元 BOM、Claude 引き継ぎ文書、設計レビュー PDF）を保管 |
 | `techmech-keeb/hid-remapper`（public。本家 jfedor2/hid-remapper のフォーク） | 変更なし。本家 master = `51ab8b3`（2026-09-26 確認） |
 | orbit-remapper のブランチ `docs/draft-design-record-20260926` | **削除しない**。E1 の生成物（STL・描画・ビューア）が Release 作成（Issue #3）まで ここにしかない |
 

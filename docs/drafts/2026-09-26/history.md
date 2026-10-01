@@ -6,7 +6,7 @@ finalized: false
 
 # 検討経緯と判断理由
 
-初期からE1までの詳細は当時のClaude引き継ぎ原文に記録されています。原文は非公開の原本として、private の `techmech-keeb/keyboard-hardware` の `products/orbit-remapper/archive/2026-09-26/originals/remapper_claude_handoff.md` に保存しています（[成果物一覧](artifacts.md)）。以下は後続の検討を含む索引です。個々の出来事に、記録のない正確な日時は付与していません。
+初期からE1までの詳細は当時のClaude引き継ぎ原文に記録されています。原文は非公開の原本として、非公開の保管先（別の private リポジトリ）に保存しています（[成果物一覧](artifacts.md)）。以下は後続の検討を含む索引です。個々の出来事に、記録のない正確な日時は付与していません。
 
 ## 機構・外観の変遷
 
