@@ -182,10 +182,12 @@ static void build(void) {
     lv_obj_align(state_line, LV_ALIGN_CENTER, 0, 54);
 
     footer = make_label(scr, &lv_font_montserrat_12, C_DIM);
-    lv_obj_set_size(footer, 150, 16);
+    // 140 px at 30 px from the edge stays inside the circle in every
+    // rotation (e72c27a report: the last letter touched the edge at 180).
+    lv_obj_set_size(footer, 140, 16);
     lv_obj_set_style_text_align(footer, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(footer, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, -26);
+    lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, -30);
 
     menu = lv_obj_create(scr);
     // Round, so that nothing of it leaves the panel; the rest of the screen
