@@ -145,13 +145,14 @@ static void build(void) {
     lv_obj_set_style_arc_color(ring, lv_color_hex(C_GREY), LV_PART_INDICATOR);
     shown.ring_color = C_GREY;
 
+    // Near the top the circle is only ~130 px wide: keep the title short and a little lower.
     title = make_label(scr, &lv_font_montserrat_14, C_DIM);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 18);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 24);
 
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         card[i] = lv_obj_create(scr);
         lv_obj_set_size(card[i], 168, 46);
-        lv_obj_align(card[i], LV_ALIGN_CENTER, 0, -36 + i * 52);
+        lv_obj_align(card[i], LV_ALIGN_CENTER, 0, -40 + i * 52);
         lv_obj_set_style_radius(card[i], 10, 0);
         lv_obj_set_style_pad_all(card[i], 6, 0);
         lv_obj_set_scrollable(card[i], false);
@@ -173,32 +174,35 @@ static void build(void) {
     shown.selected = -1;
 
     // Kept inside the circle: 184 px wide at 46 px below the centre, cut with dots.
+    // One line only (fixed height, dots when too long), below the cards.
     state_line = make_label(scr, &lv_font_montserrat_14, C_TEXT);
-    lv_obj_set_width(state_line, 184);
+    lv_obj_set_size(state_line, 190, 18);
     lv_obj_set_style_text_align(state_line, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(state_line, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_align(state_line, LV_ALIGN_CENTER, 0, 44);
+    lv_obj_align(state_line, LV_ALIGN_CENTER, 0, 54);
 
     footer = make_label(scr, &lv_font_montserrat_12, C_DIM);
-    lv_obj_set_width(footer, 150);
+    lv_obj_set_size(footer, 150, 16);
     lv_obj_set_style_text_align(footer, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(footer, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, -26);
 
     menu = lv_obj_create(scr);
-    lv_obj_set_size(menu, 196, 196);
+    // Round, so that nothing of it leaves the panel; the rest of the screen
+    // hides while it is open (9c63777 report: the title peeked out above it).
+    lv_obj_set_size(menu, 200, 200);
     lv_obj_center(menu);
-    lv_obj_set_style_radius(menu, 14, 0);
+    lv_obj_set_style_radius(menu, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(menu, lv_color_hex(C_CARD), 0);
     lv_obj_set_style_border_color(menu, lv_color_hex(C_BLUE), 0);
     lv_obj_set_style_border_width(menu, 2, 0);
     lv_obj_set_style_pad_all(menu, 10, 0);
     lv_obj_set_scrollable(menu, false);
     for (int i = 0; i < 8; i++) {
-        menu_item[i] = make_label(menu, &lv_font_montserrat_16, C_TEXT);
-        lv_obj_set_width(menu_item[i], 172);
+        menu_item[i] = make_label(menu, &lv_font_montserrat_14, C_TEXT);
+        lv_obj_set_size(menu_item[i], 150, 18);
+        lv_obj_set_style_text_align(menu_item[i], LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_long_mode(menu_item[i], LV_LABEL_LONG_MODE_DOTS);
-        lv_obj_align(menu_item[i], LV_ALIGN_TOP_MID, 0, 6 + i * 25);
     }
     lv_obj_set_hidden(menu, true);
 
@@ -274,6 +278,7 @@ static void render_menu(void) {
             lv_label_set_text(menu_item[i], "");
             continue;
         }
+        lv_obj_align(menu_item[i], LV_ALIGN_CENTER, 0, (i - (menu_count - 1) / 2.0) * 24);
         char text[48];
         switch (menu_kind[i]) {
         case M_PAIR:
@@ -305,10 +310,20 @@ static void render_menu(void) {
     }
 }
 
+static void show_main(bool on) {
+    lv_obj_set_hidden(title, !on);
+    lv_obj_set_hidden(state_line, !on);
+    lv_obj_set_hidden(footer, !on);
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        lv_obj_set_hidden(card[i], !on);
+    }
+}
+
 static void menu_close(void) {
     confirm_forget = 0;
     menu_open = 0;
     lv_obj_set_hidden(menu, true);
+    show_main(true);
 }
 
 static void menu_act(void) {
@@ -409,6 +424,7 @@ static void poll_input(lv_timer_t* t) {
             confirm_forget = 0;
             menu_opened_us = now;
             render_menu();
+            show_main(false);
             lv_obj_set_hidden(menu, false);
         }
     }
@@ -510,7 +526,7 @@ static uint32_t ring_color(const orbit_ui_state_t* s, char* buf, int len) {
         if (s->pairing_remaining_s < 0) {
             snprintf(buf, len, "Pairing: turn on a device");
         } else {
-            snprintf(buf, len, "Pairing %ds: turn on a device", s->pairing_remaining_s);
+            snprintf(buf, len, "Pairing %ds: turn on device", s->pairing_remaining_s);
         }
         return C_YELLOW;
     }
@@ -531,10 +547,10 @@ static uint32_t ring_color(const orbit_ui_state_t* s, char* buf, int len) {
         return s->devices == 0 ? C_GREY : C_BLUE;
     }
     if (connected < s->devices && connected < ORBIT_MAX_DEVS) {
-        snprintf(buf, len, "%d connected, waiting for more", connected);
+        snprintf(buf, len, "%d connected, waiting", connected);
         return C_BLUE;
     }
-    snprintf(buf, len, "%d device(s) connected", connected);
+    snprintf(buf, len, connected == 1 ? "1 device connected" : "%d devices connected", connected);
     return C_GREEN;
 }
 
@@ -562,7 +578,7 @@ void orbit_ui_update(const orbit_ui_state_t* s) {
     set_text_if_changed(state_line, shown.state, sizeof(shown.state), buf);
 
     char t[48];
-    snprintf(t, sizeof(t), "ORBIT  %s  %d/%d", s->version, s->devices, s->max_devices);
+    snprintf(t, sizeof(t), "ORBIT  %d/%d", s->devices, s->max_devices);
     set_text_if_changed(title, shown.title, sizeof(shown.title), t);
 
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
@@ -587,14 +603,10 @@ void orbit_ui_update(const orbit_ui_state_t* s) {
         }
     }
 
-    // The footer rounds LAT to 0.5 ms so that it does not redraw every second.
+    // Only what a user can act on: the USB state and the version. Latency,
+    // heap and the last event stay in the log (015df03 report).
     char f[64];
-    if (s->lat_max_ms > 0) {
-        snprintf(f, sizeof(f), "USB %s  LAT %.1f ms  %uK", s->usb, ((int) (s->lat_max_ms * 2 + 0.5)) / 2.0,
-                 s->heap_free / 1024);
-    } else {
-        snprintf(f, sizeof(f), "USB %s  %uK  %s", s->usb, s->heap_free / 1024, s->last_event);
-    }
+    snprintf(f, sizeof(f), "USB %s  %s", s->usb, s->version);
     set_text_if_changed(footer, shown.footer, sizeof(shown.footer), f);
 
     if (menu_open) {
