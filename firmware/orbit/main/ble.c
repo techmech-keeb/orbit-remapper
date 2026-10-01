@@ -1847,15 +1847,28 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // could pair itself in. (a0d8f9e report: a stale key that the
             // device ignored used to leave Forget all devices as the only
             // way out.)
+            if (!is_bonded(&d->addr)) {
+                // We hold no key, so this was a fresh pairing request that
+                // the device refused (0x505): it still holds a key for us
+                // from before and expects encryption instead. Only clearing
+                // Orbit on the device helps; reconnecting at once looped
+                // every 0.5 s (e72c27a report: 9 and 7 rounds).
+                give_up_on(d, "device refused to pair: it still holds an old key for Orbit; clear Orbit on the device",
+                           hci(event->enc_change.status));
+                return 0;
+            }
             EVT(d, "stored key failed status=0x%x, pairing again (%s)", event->enc_change.status,
                 peers_only ? "approved" : "pairing mode");
             d->repaired = true;
             ble_store_util_delete_peer(&d->addr);
             int rc = ble_gap_security_initiate(d->conn_handle);
             if (rc != 0) {
-                // Drop the link; the key is gone, so the reconnect pairs afresh.
-                EVT(d, "pairing start failed rc=0x%x, reconnecting", rc);
-                ble_gap_terminate(d->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+                // The failed procedure may still occupy NimBLE's one SM slot
+                // (rc=0x6); retry from periodic_check() instead of dropping
+                // the link.
+                EVT(d, "pairing start failed rc=0x%x, retrying", rc);
+                d->sec_pending = true;
+                d->encrypted = false;
             }
             return 0;
         }
