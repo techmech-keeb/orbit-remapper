@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdint.h>
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +22,9 @@ typedef struct {
 } display_line_t;
 
 void display_init(void);
+// The panel and its IO, for LVGL (ui.c) to take over. NULL before init or on failure.
+esp_lcd_panel_handle_t display_panel(void);
+esp_lcd_panel_io_handle_t display_io(void);
 
 // Redraws the whole screen. Each line is centred because the panel is round.
 void display_show(const display_line_t lines[DISPLAY_ROWS]);
