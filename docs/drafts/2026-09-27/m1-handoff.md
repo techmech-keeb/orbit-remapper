@@ -10,8 +10,22 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 ## 0. ローカルのセッションへの伝言（最新。ここだけ読めば次の作業ができる）
 
-- PR [#24](https://github.com/techmech-keeb/orbit-remapper/pull/24) はマージ済み（`8fdeb32`）。M1 の残りは A5（BIOS）と任意の回帰確認だけ。**次は M2**（依頼書 [m2-brief.md](../2026-09-30/m2-brief.md)）。M2 の版ができたら、この §0 を書き換える。
-- いま試験することはない（MD600・meteorite40 の回帰確認を行う場合を除く）。`fb7b88f` の `button released after N ms` は M2 の最初の版で確かめる。
+- `302af13` の確認（[報告](../2026-09-27/reports/m2-302af13-report.md)）：保存の期限と探索中の入力の減りは直った。誤った WARNING は、私が足した「PARING_COMPLETE の時点で受け入れる」経路で同じことが起きた（報告のとおり、この時点ではまだ鍵が保存されていない）。**`4903ae1` で直した**（PR #27 の中）：その経路を外し、読み取りで受け入れるのは「登録済みで、鍵が保存されていて、指紋が変わっていない（または受け入れ前に鍵が無かった新しいペアリング）」だけに。受け入れ済みの接続で指紋が 0 から初めて値になったときは「置き換え」ではなく「鍵が保存された」と扱う（`keys stored for this new pairing`）。報告の案の両方を組み合わせた形。
+- 報告の 2（`hub_port=2` の秒の `LAT` 3.6〜4.1 ms）：本家コアの記述子の解釈が主ループで走る分で、ペアリングのときだけ。急がないので m2-results §4 に記録し、手は入れない。
+- **新しい版 `4903ae1`**（`orbit-m2-4903ae1-ble.bin`。名前と SHA-256 は利用者が貼る）。`302af13` との違いは受け入れの経路だけ。
+- **試験**：
+  1. 書き込み後の起動で 2 台が `(stored key)` でつながること（`at pairing complete` の行は無くなる）。
+  2. IST を動かし続けながら `orbit forget 2` → `orbit pair` → Cube Turner をペアリングし直す（2 回）。**`WARNING` が 0 回**で、`encryption on (new pairing) pairing mode` か `new pairing found by polling` で受け入れ、切られずにそのままポート 2 で動くこと（`pair_new_device` から `hub_port=2` までの時間も）。
+  3. できれば：IST を **60 秒以上止めずに** 動かし続けながら `orbit alias 2 pedal` → 動かし続ける限り `ledger saved` が出ないこと（前回は手が 17 秒で止まり未確認）。`orbit alias 2` で戻す。
+  4. 3 分の使用で切断 0、`LAT` の基準（3 ms 超の秒が 1 分に 1 回以下、5 ms 以内）。
+- 合格なら **PR #27 はマージできる状態**（マージは利用者が判断する）。次は 2b。
+- **行う場合（MD600 があるとき）**：B5・B6 は下の手順のまま。
+- **注意**：ペアリング情報の上限が 4 → 15 になったので `sdkconfig` が変わる。書き込みは今までどおり 1 ファイル（NVS は消えない）。M1 のペアリング情報 2 件は、最初の起動で台帳に足される（`ledger: bond ... had no row, added as port N`。IST が 1、Cube Turner が 2 のはず＝M1 の `hub_port` と同じ）。
+- **命令の打ち方**：ログを取っている COM ポートに 1 行ずつ送る（改行で確定）。返事は `M1 CMD` と `M1 LDG` の行。
+- **行う場合（MD600 があるとき。B5・B6 の本番）**：
+  - B5：Pair new device で MD600 をペアリング（ポート 3）→ `orbit alias 3 md600` → MD600 をリセット（アドレスが変わる）→ Pair new device で MD600 をもう一度ペアリング → `ledger: looks like port 3 (...), taking over its port` が出て、ポート 3・別名 `md600` のまま動くこと。`orbit list` で行が 3 つ（増えていない）。
+  - B6：MD600 側で Orbit のペアリングを消す（アドレスが変わらない手順があれば）→ MD600 の電源を入れ直す → `approval wanted: device has no key for us; press the button within 60 s` → 画面を短く押す → `approved: port 3 ... may pair again` → MD600 が新しい鍵でつながり `new key accepted (approved by the user)`。もう一度同じことをして、今度は押さずに 60 秒待つ → `approval for port 3 not given within 60 s (1 of 3)`。
+- **見てほしいこと**：台帳の保存（`ledger save failed` が出ないこと）、`heap_min`（台帳で約 4 KB 増える見込み）、命令を打っている間に `LAT` が増えないか。
 - 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 

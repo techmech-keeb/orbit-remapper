@@ -34,6 +34,8 @@
 #include "log.h"
 #include "orbit.h"
 #include "storage.h"
+#include "ledger.h"
+#include "commands.h"
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
 #define PIN_BUTTON     42 // screen push button, low when pressed
@@ -69,8 +71,14 @@ static struct {
     uint32_t max_us;
 } lat;
 
+// When input last arrived, for deferring flash writes. Separate from the LAT
+// reference, which orbit_report_sent() clears once a report went out (2b27551
+// report: the ledger was written at once because that read as 0).
+static int64_t last_input_us;
+
 static void lat_note_received(int64_t t_us) {
     lat_last_rx_us = t_us;
+    last_input_us = t_us;
 }
 
 void orbit_report_sent() {
@@ -145,15 +153,15 @@ static void report_device(int i, double t, const orbit_dev_stats_t* s, display_l
     struct ble_gap_conn_desc desc = {};
     ble_gap_conn_find(s->conn_handle, &desc);
     double itvl_ms = desc.conn_itvl * 1.25;
-    olog("M1 DEV t=%.0f D%d addr=..:%02x:%02x h=%u itvl=%u(%.2fms) lat=%u to=%u enc=%d subs=%d "
+    olog("M1 DEV t=%.0f D%d addr=..:%02x:%02x port=%d h=%u itvl=%u(%.2fms) lat=%u to=%u enc=%d subs=%d "
          "rpt=%lu maxgap=%.1fms gaps<=8/16/32/>32=%lu/%lu/%lu/%lu total=%lu disc=%lu\n",
-         t, i, s->addr_lo[1], s->addr_lo[0], s->conn_handle, desc.conn_itvl, itvl_ms, desc.conn_latency,
+         t, i, s->addr_lo[1], s->addr_lo[0], s->port, s->conn_handle, desc.conn_itvl, itvl_ms, desc.conn_latency,
          desc.supervision_timeout, s->encrypted, s->subscribed, (unsigned long) s->reports, s->max_gap_us / 1000.0,
          (unsigned long) s->gaps[GAP_LE_8MS], (unsigned long) s->gaps[GAP_LE_16MS],
          (unsigned long) s->gaps[GAP_LE_32MS], (unsigned long) s->gaps[GAP_OVER_32MS],
          (unsigned long) s->total_reports, (unsigned long) s->disconnects);
     uint16_t c = desc.conn_itvl == 6 ? GREEN : YELLOW;
-    set_line(&lines[0], c, "D%d %02X%02X %.2fMS", i, s->addr_lo[1], s->addr_lo[0], itvl_ms);
+    set_line(&lines[0], c, "P%d %02X%02X %.2fMS", s->port, s->addr_lo[1], s->addr_lo[0], itvl_ms);
     set_line(&lines[1], WHITE, "L%u %s S%d R%lu", desc.conn_latency, s->encrypted ? "ENC" : "RAW", s->subscribed,
              (unsigned long) s->reports);
 }
@@ -184,6 +192,7 @@ static void status_task(void* arg) {
         set_line(&lines[2], orbit_ble_pairing() ? YELLOW : WHITE, "%s %d/%d",
                  orbit_ble_pairing() ? "PAIRING" : orbit_ble_scanning() ? "SCAN" : orbit_ble_waiting() ? "WAIT" : "IDLE",
                  conn, ORBIT_MAX_DEVS);
+        orbit_commands_log_state(t);
         orbit_dev_stats_t st;
         for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
             orbit_ble_take_stats(i, &st);
@@ -237,6 +246,8 @@ static void main_loop(void* arg) {
 
         tud_task_ext(0, false);
         orbit_log_pump();
+        orbit_commands_poll();
+        orbit_ledger_flush(false, last_input_us);
 
         // From the BLE task (decision I2: only this task calls the core).
         orbit_disconnect_t disc;
@@ -310,8 +321,11 @@ static void main_loop(void* arg) {
             // Every release is logged so that a short press can be lined up
             // with the LAT lines (2cb6aad report).
             if (button_down_us > 0) {
-                olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(),
-                     (long long) ((esp_timer_get_time() - button_down_us) / 1000));
+                int64_t held_ms = (esp_timer_get_time() - button_down_us) / 1000;
+                olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(), (long long) held_ms);
+                if (held_ms >= 30) {
+                    orbit_ble_approve(); // G-2: a short press answers an open approval question
+                }
             } else {
                 olog("M1 EVT t=%.3f button released after the %d ms hold\n", orbit_now_s(), BUTTON_HOLD_MS);
             }
@@ -338,6 +352,7 @@ static void main_loop(void* arg) {
             }
             tud_disconnect();
             vTaskDelay(pdMS_TO_TICKS(100));
+            orbit_ledger_flush(true, 0);
             orbit_enter_download_mode();
         }
     }
@@ -376,6 +391,7 @@ extern "C" void app_main() {
     olog("M1 EVT t=%.3f config loaded from NVS err=0x%x%s\n", orbit_now_s(), cfg_err,
          cfg_err == ESP_OK ? "" : " (using defaults)");
     orbit_storage_log_usage();
+    orbit_ledger_init();
 
     xTaskCreatePinnedToCore(main_loop, "main_loop", 8192, NULL, 10, &main_task, 1);
     orbit_ble_start(main_task);

@@ -20,6 +20,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "ble.h"
+#include "ledger.h"
 #include "log.h"
 
 #define UUID_HID_SERVICE 0x1812
@@ -67,6 +68,21 @@
 #define CONN_TIMEOUT 400 // 4 s
 
 #define REPORT_QUEUE_LEN 32
+
+// Pairing mode ends by itself after this (upstream waits forever; a forgotten
+// Pair new device would keep accepting anyone). Not while nothing is bonded:
+// then there is nothing else to wait for.
+#define PAIRING_TIMEOUT_US (120 * 1000000)
+
+// Requirement G: a bonded device that wants to pair again outside pairing
+// mode (it lost its key, or brings a new one) is refused, and the user is
+// asked. A short press of the button grants that one address a window to
+// pair afresh; nothing else can pair meanwhile. A prompt that is not
+// answered counts as a refusal; after APPROVAL_MAX_REFUSALS the device is
+// not asked about again until restart (G-4).
+#define APPROVAL_PROMPT_US  (60 * 1000000)
+#define APPROVAL_WINDOW_US  (60 * 1000000)
+#define APPROVAL_MAX_REFUSALS 3
 
 // A device whose encryption failed (it still holds keys from an earlier
 // pairing) reconnects at once and fails again: 280 attempts in 2 minutes,
@@ -139,6 +155,13 @@ struct dev {
     uint16_t report_map_handle;
     orbit_report_map_t report_map;
     int info_step; // next entry of info_reads[] to read after subscribing (requirement B)
+    // What the device said about itself, handed to the ledger once all reads are done.
+    char info_name[ORBIT_LEDGER_TEXT_MAX + 1];
+    char info_manufacturer[ORBIT_LEDGER_TEXT_MAX + 1];
+    char info_model[ORBIT_LEDGER_TEXT_MAX + 1];
+    uint16_t info_vid, info_pid, info_appearance;
+    bool map_pending; // report map held back until the ledger row is settled (new device)
+    uint32_t map_hash;
 
     // Report statistics
     int64_t last_report_us;
@@ -190,8 +213,35 @@ static struct ble_npl_callout resume_co;
 static volatile bool scanning;
 static volatile bool peers_only = true; // scan for bonded devices only
 static int last_scan_rc;
-static struct ble_npl_event periodic_ev, pair_ev, stop_pair_ev, clear_bonds_ev;
+static struct ble_npl_event periodic_ev, pair_ev, stop_pair_ev, clear_bonds_ev, cmd_ev;
+static int64_t pairing_since_us; // start of the current pairing mode (0: not pairing)
+static bool bonds_full_seen;     // a pairing was refused because the ledger is full (cleared by forget)
+
+// Ledger commands from other tasks (config tool, serial), run on the host task.
+typedef struct {
+    enum { CMD_FORGET, CMD_MOVE } kind;
+    int a, b;
+} cmd_t;
+static QueueHandle_t cmd_q;
+static struct ble_npl_event approve_ev;
+
+static struct {
+    bool wanted;
+    ble_addr_t addr;
+    int port;
+    const char* reason;
+    int64_t since_us;
+} approval; // the open question (G-1)
+static struct {
+    ble_addr_t addr;
+    int64_t until_us; // 0: none
+} approved; // the granted window (G-2)
+static struct {
+    ble_addr_t addr;
+    uint8_t refusals;
+} refusals[ORBIT_LEDGER_MAX]; // unanswered prompts per address (G-4)
 static char last_event[24] = "START";
+static bool duplicates_seen; // two or more ledger rows look like one device (info_done)
 static TaskHandle_t wake_task;
 static QueueHandle_t report_q, report_map_q, disconnect_q;
 static uint32_t reports_lost;
@@ -257,6 +307,8 @@ static void discover_next_report(dev_t* d);
 static void start_discovery(dev_t* d);
 static void schedule(void);
 static bool is_bonded(const ble_addr_t* addr);
+static int ensure_row(dev_t* d);
+static void stop_pairing_ev(struct ble_npl_event* ev);
 
 static double now_s(void) {
     return esp_timer_get_time() / 1e6;
@@ -284,6 +336,56 @@ static void set_last_event(const char* what, int slot, int status) {
 #define EVT(d, fmt, ...) \
     olog("M1 EVT t=%.3f D%d addr=..:%02x:%02x " fmt "\n", now_s(), (int) ((d) - devs), (d)->addr.val[1], \
          (d)->addr.val[0], ##__VA_ARGS__)
+
+static bool approved_for(const ble_addr_t* addr) {
+    return approved.until_us > esp_timer_get_time() && ble_addr_cmp(&approved.addr, addr) == 0;
+}
+
+static uint8_t* refusals_of(const ble_addr_t* addr) {
+    int free_i = -1;
+    for (int i = 0; i < ORBIT_LEDGER_MAX; i++) {
+        if (refusals[i].refusals != 0 && ble_addr_cmp(&refusals[i].addr, addr) == 0) {
+            return &refusals[i].refusals;
+        }
+        if (refusals[i].refusals == 0 && free_i < 0) {
+            free_i = i;
+        }
+    }
+    if (free_i < 0) {
+        free_i = 0;
+    }
+    refusals[free_i].addr = *addr;
+    refusals[free_i].refusals = 0;
+    return &refusals[free_i].refusals;
+}
+
+// G-1: raise the question for a bonded device (one with a ledger row).
+static void ask_approval(dev_t* d, const char* reason) {
+    int port = orbit_ledger_port(&d->addr);
+    if (port == 0 || approved_for(&d->addr)) {
+        return;
+    }
+    if (approval.wanted && ble_addr_cmp(&approval.addr, &d->addr) == 0) {
+        return; // already asking about this device
+    }
+    if (*refusals_of(&d->addr) >= APPROVAL_MAX_REFUSALS) {
+        EVT(d, "%s; not asking again until restart (%d prompts went unanswered)", reason, APPROVAL_MAX_REFUSALS);
+        return;
+    }
+    approval.wanted = true;
+    approval.addr = d->addr;
+    approval.port = port;
+    approval.reason = reason;
+    approval.since_us = esp_timer_get_time();
+    EVT(d, "approval wanted: %s; press the button within %d s to let port %d pair again", reason,
+        (int) (APPROVAL_PROMPT_US / 1000000), port);
+    set_last_event("ASK", (int) (d - devs), port);
+}
+
+static void clear_approval(void) {
+    approval.wanted = false;
+    approval.reason = NULL;
+}
 
 // Drops the link; the device is excluded for AVOID_US once this has
 // happened MAX_FAILS times in a row.
@@ -411,11 +513,24 @@ static void on_encrypted(dev_t* d, const char* when) {
                                                 : "new pairing, replaced the stored key";
     EVT(d, "encryption on (%s)%s%s", how, peers_only ? "" : " pairing mode", when);
     if (peers_only && now_tag != d->key_tag) {
-        // Nothing should pair outside pairing mode (3c46caa, b8d689d).
-        EVT(d, "WARNING: paired outside pairing mode");
+        if (approved_for(&d->addr)) {
+            // G-2: the user allowed this one device to pair again.
+            EVT(d, "new key accepted (approved by the user)");
+            approved.until_us = 0;
+            *refusals_of(&d->addr) = 0;
+        } else {
+            // Nothing should pair outside pairing mode (3c46caa, b8d689d).
+            EVT(d, "WARNING: paired outside pairing mode");
+        }
     }
     d->key_tag = now_tag;
     peers_only = true; // as upstream: back to bonded devices only after a successful pairing
+    pairing_since_us = 0;
+    int port = ensure_row(d);
+    if (port != 0) {
+        orbit_ledger_touch(port);
+        orbit_ledger_set_key(port, true);
+    }
     if (d->discovering) {
         // Subscribing before encryption may have failed; retry once it is up.
         if (d->discovery_finished) {
@@ -450,6 +565,23 @@ static int bond_index(const ble_addr_t* addr) {
     return 0;
 }
 
+// The ledger row of this device, made when a new device has just bonded
+// (pairing mode). Returns its port, 0 when not bonded yet or the ledger is
+// full.
+static int ensure_row(dev_t* d) {
+    int port = orbit_ledger_port(&d->addr);
+    if (port != 0 || !is_bonded(&d->addr)) {
+        return port;
+    }
+    port = orbit_ledger_add(&d->addr, true);
+    if (port == 0) {
+        EVT(d, "ledger full, no port for this device");
+    } else {
+        EVT(d, "ledger: new device, port %d", port);
+    }
+    return port;
+}
+
 static const struct ble_gap_conn_params conn_params = {
     .scan_itvl = 0x60,   // 60 ms: how often the controller listens while waiting
     .scan_window = 0x30, // 30 ms
@@ -468,15 +600,21 @@ static void start_scan(void) {
     // per scan, so a device skipped while it was being avoided (or while it
     // was busy) would never be seen again until the scan restarted (0a0cfcf
     // report: a bonded keyboard stayed invisible for an hour).
+    // 30 ms of every 60 ms when nothing is connected. With a device
+    // connected, the scan took the radio away from it: the IST Trackball's
+    // reports fell from 100/s to near 0 while pairing another device
+    // (230e758 report), so then listen 10 ms of every 100 ms; pairing
+    // takes a little longer.
+    bool busy = orbit_ble_connected_count() > 0;
     const struct ble_gap_disc_params params = {
-        .itvl = 0x60,   // 60 ms
-        .window = 0x30, // 30 ms
+        .itvl = busy ? 0xA0 : 0x60,   // 100 ms : 60 ms
+        .window = busy ? 0x10 : 0x30, // 10 ms : 30 ms
         .filter_duplicates = 0,
     };
     int rc = ble_gap_disc(own_addr_type, BLE_HS_FOREVER, &params, gap_event, NULL);
     if (rc == 0) {
         scanning = true;
-        olog("M1 EVT t=%.3f scan start (pairing)\n", now_s());
+        olog("M1 EVT t=%.3f scan start (pairing, listening %s)\n", now_s(), busy ? "10/100 ms" : "30/60 ms");
     } else if (rc != last_scan_rc) {
         // Retried every second by periodic_check(), so only report changes.
         olog("M1 EVT t=%.3f scan start failed rc=0x%x hci=0x%02x\n", now_s(), rc, hci(rc));
@@ -590,6 +728,26 @@ static void periodic_check(struct ble_npl_event* ev) {
         connecting_cancel_logged = true;
     }
 
+    if (approval.wanted && now - approval.since_us > APPROVAL_PROMPT_US) {
+        uint8_t* n = refusals_of(&approval.addr);
+        (*n)++;
+        olog("M1 EVT t=%.3f approval for port %d not given within %d s (%u of %d); the device stays out\n", now_s(),
+             approval.port, (int) (APPROVAL_PROMPT_US / 1000000), *n, APPROVAL_MAX_REFUSALS);
+        set_last_event("NOASK", 0, approval.port);
+        clear_approval();
+    }
+    if (approved.until_us != 0 && now > approved.until_us) {
+        olog("M1 EVT t=%.3f approval window closed without a new pairing\n", now_s());
+        approved.until_us = 0;
+    }
+
+    if (!peers_only && pairing_since_us != 0 && now - pairing_since_us > PAIRING_TIMEOUT_US &&
+        orbit_ledger_count() > 0) {
+        olog("M1 EVT t=%.3f pairing mode ended after %d s without a new device\n", now_s(),
+             (int) (PAIRING_TIMEOUT_US / 1000000));
+        stop_pairing_ev(NULL);
+    }
+
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
         if (d->connected && d->sec_pending) {
@@ -657,11 +815,32 @@ static void periodic_check(struct ble_npl_event* ev) {
                     // that key has been used (security elevation), or on
                     // REPEAT_PAIRING, which we refuse. So accept it when the
                     // address is bonded and the stored key is unchanged.
-                    if (peers_only && (!is_bonded(&d->addr) || key_tag(&d->addr) != d->key_tag)) {
-                        give_up_on(d, "encrypted link with no bond or a changed key outside pairing mode", 0);
+                    uint32_t now_tag = key_tag(&d->addr);
+                    bool may_pair = !peers_only || approved_for(&d->addr);
+                    if (!is_bonded(&d->addr) || now_tag == 0) {
+                        // Encrypted, but no key stored yet: a pairing is
+                        // still running (the keys come last). Accepting it
+                        // here ended pairing mode early, and the keys
+                        // stored a moment later then read as "replaced
+                        // outside pairing mode" (230e758 and 302af13
+                        // reports). Wait for its ENC_CHANGE, or for the
+                        // keys to appear here.
+                        if (!may_pair) {
+                            ask_approval(d, "device paired with a new key");
+                            give_up_on(d, "encrypted link with no bond outside pairing mode", 0);
+                        }
                         continue;
                     }
-                    on_encrypted(d, ", found by polling (NimBLE posted no event)");
+                    if (now_tag != d->key_tag && !(may_pair && d->key_tag == 0)) {
+                        // The key changed under us: only a new pairing does that.
+                        if (!may_pair) {
+                            ask_approval(d, "device paired with a new key");
+                            give_up_on(d, "encrypted link with a changed key outside pairing mode", 0);
+                        }
+                        continue;
+                    }
+                    on_encrypted(d, d->key_tag == 0 ? ", new pairing found by polling (NimBLE posted no event)"
+                                                    : ", found by polling (NimBLE posted no event)");
                     continue;
                 }
             }
@@ -672,11 +851,15 @@ static void periodic_check(struct ble_npl_event* ev) {
         if (d->connected && !d->encrypted && !d->sec_pending && d->sec_started_us != 0 &&
             now - d->sec_started_us > ENC_WAIT_US) {
             log_security(d, "no answer");
-            if (!peers_only && is_bonded(&d->addr)) {
-                // Pairing mode: the stored key got no answer at all. Forget
-                // it so that the reconnect pairs afresh (a0d8f9e report).
-                EVT(d, "no encryption after 5 s, forgetting the stored key (pairing mode)");
+            if ((!peers_only || approved_for(&d->addr)) && is_bonded(&d->addr)) {
+                // Pairing mode (or approved): the stored key got no answer
+                // at all. Forget it so that the reconnect pairs afresh
+                // (a0d8f9e report).
+                EVT(d, "no encryption after 5 s, forgetting the stored key (%s)",
+                    peers_only ? "approved" : "pairing mode");
                 ble_store_util_delete_peer(&d->addr);
+            } else if (peers_only && is_bonded(&d->addr)) {
+                ask_approval(d, "no answer to the stored key");
             }
             give_up_on(d, "no encryption after 5 s", 0);
         }
@@ -685,8 +868,17 @@ static void periodic_check(struct ble_npl_event* ev) {
 }
 
 static void pair_new_device_ev(struct ble_npl_event* ev) {
+    if (orbit_ledger_full()) {
+        // J1: never overwrite a bond silently; the user forgets one first.
+        olog("M1 EVT t=%.3f pair_new_device refused: ledger full (%d devices), forget one first\n", now_s(),
+             ORBIT_LEDGER_MAX);
+        bonds_full_seen = true;
+        set_last_event("FULL", 0, -1);
+        return;
+    }
     olog("M1 EVT t=%.3f pair_new_device\n", now_s());
     peers_only = false;
+    pairing_since_us = esp_timer_get_time();
     if (wl_waiting) {
         ble_gap_conn_cancel(); // the connect event that follows leads to schedule()
     } else {
@@ -704,6 +896,7 @@ static void stop_pairing_ev(struct ble_npl_event* ev) {
     }
     olog("M1 EVT t=%.3f stop_pairing bonds=%d\n", now_s(), n);
     peers_only = true;
+    pairing_since_us = 0;
     if (scanning) {
         int rc = ble_gap_disc_cancel();
         if (rc != 0 && rc != BLE_HS_EALREADY) {
@@ -718,6 +911,12 @@ static void stop_pairing_ev(struct ble_npl_event* ev) {
 static void clear_bonds_on_host(struct ble_npl_event* ev) {
     int rc = ble_store_clear();
     olog("M1 EVT t=%.3f clear_bonds rc=0x%x\n", now_s(), rc);
+    orbit_ledger_row_t row;
+    while (orbit_ledger_nth(0, &row)) {
+        orbit_ledger_forget(row.port);
+    }
+    bonds_full_seen = false;
+    pairing_since_us = esp_timer_get_time();
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         if (devs[i].connected) {
             ble_gap_terminate(devs[i].conn_handle, BLE_ERR_REM_USER_CONN_TERM);
@@ -733,6 +932,63 @@ static bool is_bonded(const ble_addr_t* addr) {
     return bond_index(addr) != 0;
 }
 
+static void drop_links_of(const ble_addr_t* addr, const char* why) {
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        if (devs[i].connected && ble_addr_cmp(&devs[i].addr, addr) == 0) {
+            EVT(&devs[i], "%s, dropping the link", why);
+            ble_gap_terminate(devs[i].conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+        }
+    }
+}
+
+// The accept list is built from the bond list at the start of each round;
+// end the current round so that the next one sees the change.
+static void restart_wait(void) {
+    if (wl_waiting) {
+        ble_gap_conn_cancel(); // the connect event that follows leads to schedule()
+    } else {
+        schedule();
+    }
+}
+
+static void run_commands(struct ble_npl_event* ev) {
+    cmd_t c;
+    while (xQueueReceive(cmd_q, &c, 0) == pdTRUE) {
+        orbit_ledger_row_t row, old;
+        switch (c.kind) {
+        case CMD_FORGET:
+            if (!orbit_ledger_get(c.a, &row)) {
+                olog("M1 EVT t=%.3f forget: no port %d\n", now_s(), c.a);
+                break;
+            }
+            olog("M1 EVT t=%.3f forget port %d addr=..:%02x:%02x\n", now_s(), c.a, row.addr.val[1], row.addr.val[0]);
+            drop_links_of(&row.addr, "forgotten");
+            ble_store_util_delete_peer(&row.addr);
+            orbit_ledger_forget(c.a);
+            fail_clear(&row.addr);
+            bonds_full_seen = false;
+            restart_wait();
+            break;
+        case CMD_MOVE:
+            // The new device (port a) becomes port b; b's row and bond go.
+            if (!orbit_ledger_get(c.a, &row) || !orbit_ledger_get(c.b, &old) || c.a == c.b) {
+                olog("M1 EVT t=%.3f move: ports %d -> %d not valid\n", now_s(), c.a, c.b);
+                break;
+            }
+            olog("M1 EVT t=%.3f move: port %d addr=..:%02x:%02x takes over port %d addr=..:%02x:%02x\n", now_s(), c.a,
+                 row.addr.val[1], row.addr.val[0], c.b, old.addr.val[1], old.addr.val[0]);
+            drop_links_of(&old.addr, "replaced");
+            ble_store_util_delete_peer(&old.addr);
+            orbit_ledger_move(c.a, c.b);
+            // The core learned port a with the report map; it hears the new
+            // number when the device reconnects.
+            drop_links_of(&row.addr, "port changed");
+            restart_wait();
+            break;
+        }
+    }
+}
+
 // Device names are shown and logged as they come, so anything outside
 // printable ASCII becomes '?' and long names are cut.
 static void copy_printable(char* out, size_t out_len, const uint8_t* in, size_t in_len) {
@@ -746,6 +1002,22 @@ static void copy_printable(char* out, size_t out_len, const uint8_t* in, size_t 
 // A keyboard waking from sleep may advertise without the HID UUID
 // (prior-art.md, esp32-hid-gamepad-bridge §4.20), so bonded addresses and
 // directed advertising count as well.
+// G-2: the button was pressed (or the config tool sent approve).
+static void approve_ev_fn(struct ble_npl_event* ev) {
+    if (!approval.wanted) {
+        olog("M1 EVT t=%.3f approve: nothing is waiting for approval\n", now_s());
+        return;
+    }
+    approved.addr = approval.addr;
+    approved.until_us = esp_timer_get_time() + APPROVAL_WINDOW_US;
+    olog("M1 EVT t=%.3f approved: port %d addr=..:%02x:%02x may pair again within %d s\n", now_s(), approval.port,
+         approval.addr.val[1], approval.addr.val[0], (int) (APPROVAL_WINDOW_US / 1000000));
+    set_last_event("OK", 0, approval.port);
+    fail_clear(&approval.addr); // it may have been excluded for 30 s; let it back in now
+    clear_approval();
+    restart_wait();
+}
+
 static bool is_candidate(const struct ble_gap_disc_desc* disc) {
     if (avoided(&disc->addr)) {
         return false;
@@ -754,6 +1026,15 @@ static bool is_candidate(const struct ble_gap_disc_desc* disc) {
         return true;
     }
     if (peers_only) {
+        return false;
+    }
+    if (orbit_ledger_full()) {
+        if (!bonds_full_seen) {
+            olog("M1 EVT t=%.3f ledger full (%d devices): not connecting new devices, forget one first\n", now_s(),
+                 ORBIT_LEDGER_MAX);
+            bonds_full_seen = true;
+            set_last_event("FULL", 0, -1);
+        }
         return false;
     }
     struct ble_hs_adv_fields fields;
@@ -874,14 +1155,25 @@ static int on_info(uint16_t conn_handle, const struct ble_gatt_error* error, str
         os_mbuf_copydata(attr->om, 0, len, v);
         uint16_t uuid = info_reads[d->info_step].uuid;
         if (uuid == UUID_APPEARANCE && len >= 2) {
-            EVT(d, "info %s=0x%04x", what, (unsigned) (v[0] | (v[1] << 8)));
+            d->info_appearance = (uint16_t) (v[0] | (v[1] << 8));
+            EVT(d, "info %s=0x%04x", what, d->info_appearance);
         } else if (uuid == UUID_PNP_ID && len >= 7) {
-            EVT(d, "info %s: vendor_source=%u vid=0x%04x pid=0x%04x version=0x%04x", what, v[0],
-                (unsigned) (v[1] | (v[2] << 8)), (unsigned) (v[3] | (v[4] << 8)), (unsigned) (v[5] | (v[6] << 8)));
+            d->info_vid = (uint16_t) (v[1] | (v[2] << 8));
+            d->info_pid = (uint16_t) (v[3] | (v[4] << 8));
+            EVT(d, "info %s: vendor_source=%u vid=0x%04x pid=0x%04x version=0x%04x", what, v[0], d->info_vid,
+                d->info_pid, (unsigned) (v[5] | (v[6] << 8)));
         } else {
             char text[32];
             copy_printable(text, sizeof(text), v, len);
             EVT(d, "info %s=\"%s\" (%d byte(s))", what, text, len);
+            char* dst = uuid == UUID_DEVICE_NAME    ? d->info_name
+                        : uuid == UUID_MANUFACTURER ? d->info_manufacturer
+                        : uuid == UUID_MODEL_NUMBER ? d->info_model
+                                                    : NULL;
+            if (dst != NULL) {
+                strncpy(dst, text, ORBIT_LEDGER_TEXT_MAX);
+                dst[ORBIT_LEDGER_TEXT_MAX] = '\0';
+            }
         }
         return 0; // NimBLE reports the end with BLE_HS_EDONE
     }
@@ -895,8 +1187,63 @@ static int on_info(uint16_t conn_handle, const struct ble_gatt_error* error, str
     return 0;
 }
 
+// Hands the report map to the core. Delayed for a new device until its
+// ledger row is settled, so that the core hears the final port number.
+static void deliver_report_map(dev_t* d) {
+    orbit_report_map_t* m = &d->report_map;
+    m->hub_port = orbit_ledger_port(&d->addr);
+    d->map_pending = false;
+    EVT(d, "report map %u byte(s) hash=%08x, hub_port=%u", m->len, (unsigned) d->map_hash, m->hub_port);
+    if (m->len > 0 && xQueueSend(report_map_q, m, 0) == pdTRUE) {
+        wake();
+    }
+}
+
+// All reads done: fill the ledger row. A row added in this session is
+// compared with the older rows: when exactly one looks like the same
+// device and that one is not connected, the new row takes over its port
+// (requirement D, decision J3: a device whose address changed after a
+// reset). With two or more candidates nothing is replaced; the user picks.
+static void info_done(dev_t* d) {
+    int port = orbit_ledger_port(&d->addr);
+    if (port == 0) {
+        if (d->map_pending) {
+            deliver_report_map(d);
+        }
+        return;
+    }
+    orbit_ledger_set_text(port, d->info_name, d->info_manufacturer, d->info_model);
+    orbit_ledger_set_ids(port, d->info_vid, d->info_pid, d->info_appearance);
+    orbit_ledger_row_t row;
+    if (orbit_ledger_get(port, &row) && (row.flags & ORBIT_LEDGER_NEW)) {
+        int similar[ORBIT_LEDGER_MAX];
+        int n = orbit_ledger_similar(port, similar, ORBIT_LEDGER_MAX);
+        orbit_ledger_row_t old;
+        if (n == 1 && orbit_ledger_get(similar[0], &old) && !addr_in_use(&old.addr)) {
+            EVT(d, "ledger: looks like port %d (addr=..:%02x:%02x, not connected), taking over its port", similar[0],
+                old.addr.val[1], old.addr.val[0]);
+            orbit_ledger_move(port, similar[0]);
+            ble_store_util_delete_peer(&old.addr);
+            port = similar[0];
+        } else if (n >= 1) {
+            EVT(d, "ledger: %d row(s) look like this device, kept as port %d; forget the old one by hand", n, port);
+            duplicates_seen = true;
+        }
+        orbit_ledger_clear_flag(port, ORBIT_LEDGER_NEW);
+    }
+    char name[64];
+    if (orbit_ledger_get(port, &row)) {
+        orbit_ledger_display_name(&row, name, sizeof(name));
+        EVT(d, "ledger: port %d \"%s\" kind=%s", port, name, orbit_ledger_kind_name(row.kind));
+    }
+    if (d->map_pending) {
+        deliver_report_map(d);
+    }
+}
+
 static void read_next_info(dev_t* d) {
     if (d->info_step >= (int) (sizeof(info_reads) / sizeof(info_reads[0]))) {
+        info_done(d);
         return;
     }
     int rc = ble_gattc_read_by_uuid(d->conn_handle, 1, 0xFFFF, BLE_UUID16_DECLARE(info_reads[d->info_step].uuid),
@@ -1072,14 +1419,22 @@ static int on_report_map(uint16_t conn_handle, const struct ble_gatt_error* erro
         m->len = 0; // a partial descriptor must not reach the core
     }
     m->interface = (uint16_t) ((d - devs) << 8);
-    m->hub_port = bond_index(&d->addr);
     uint32_t hash = 2166136261u; // FNV-1a: tells report maps apart in the log without dumping them
     for (unsigned i = 0; i < m->len; i++) {
         hash = (hash ^ m->data[i]) * 16777619u;
     }
-    EVT(d, "report map %u byte(s) hash=%08x, hub_port=%u", m->len, (unsigned) hash, m->hub_port);
-    if (m->len > 0 && xQueueSend(report_map_q, m, 0) == pdTRUE) {
-        wake();
+    d->map_hash = hash;
+    int port = ensure_row(d);
+    orbit_ledger_row_t row;
+    bool is_new = port != 0 && orbit_ledger_get(port, &row) && (row.flags & ORBIT_LEDGER_NEW);
+    if (port != 0 && m->len > 0) {
+        orbit_ledger_set_map(port, hash, orbit_ledger_kind_of_map(m->data, m->len));
+    }
+    if (is_new) {
+        d->map_pending = true; // the port may still change in info_done()
+        EVT(d, "report map %u byte(s) hash=%08x, held until the ledger row is settled", m->len, (unsigned) hash);
+    } else {
+        deliver_report_map(d);
     }
     d->cur_chr = 0;
     discover_next_report(d);
@@ -1471,6 +1826,10 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // Posted for a stored-key encryption too, not only for a pairing.
             EVT(d, "security done status=0x%x", event->pairing_complete.status);
             log_security(d, "after security");
+            // Not the point to accept a new pairing: NimBLE posts this
+            // before it stores the keys (302af13 report: "no stored peer
+            // keys" right here, and accepting ended pairing mode so that
+            // the keys stored a moment later read as a replacement).
         }
         return 0;
 
@@ -1480,7 +1839,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             return 0;
         }
         d->sec_pending = false; // decided either way; never start it again on this link
-        if (event->enc_change.status != 0 && !peers_only && !d->repaired) {
+        if (event->enc_change.status != 0 && (!peers_only || approved_for(&d->addr)) && !d->repaired) {
             // Pairing mode, and the stored key did not work: the device says
             // it has none (it was re-paired elsewhere or reset), or it did
             // not answer. Replacing our bond is a new pairing, so only in
@@ -1488,7 +1847,8 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // could pair itself in. (a0d8f9e report: a stale key that the
             // device ignored used to leave Forget all devices as the only
             // way out.)
-            EVT(d, "stored key failed status=0x%x, pairing again (pairing mode)", event->enc_change.status);
+            EVT(d, "stored key failed status=0x%x, pairing again (%s)", event->enc_change.status,
+                peers_only ? "approved" : "pairing mode");
             d->repaired = true;
             ble_store_util_delete_peer(&d->addr);
             int rc = ble_gap_security_initiate(d->conn_handle);
@@ -1500,12 +1860,16 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             return 0;
         }
         if (event->enc_change.status == BLE_HS_HCI_ERR(BLE_ERR_PINKEY_MISSING) && peers_only) {
-            give_up_on(d, "device lost the bond; press Pair new device to pair it again", 0);
+            ask_approval(d, "device has no key for us");
+            give_up_on(d, "device lost the bond; press the button (or Pair new device) to pair it again", 0);
             return 0;
         }
         if (event->enc_change.status != 0) {
             EVT(d, "encryption failed status=0x%x", event->enc_change.status);
             log_security(d, "at failure");
+            if (peers_only) {
+                ask_approval(d, "stored key failed");
+            }
             // Usually the device still holds keys from an earlier pairing that
             // we no longer have. Keeping the link would only block a slot
             // (6254d16 report); drop it, and the device can pair afresh.
@@ -1516,10 +1880,23 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
             // A second event on an accepted link: a key refresh, or the
             // end of a pairing that ran on after we accepted the link.
             uint32_t now_tag = key_tag(&d->addr);
-            if (now_tag != d->key_tag && peers_only) {
+            if (d->key_tag == 0 && now_tag != 0) {
+                // The link was accepted before its keys were stored (a new
+                // pairing); this is the first key on it, not a replacement.
+                EVT(d, "keys stored for this new pairing");
+                d->key_tag = now_tag;
+                return 0;
+            }
+            if (now_tag != d->key_tag && peers_only && !approved_for(&d->addr)) {
                 EVT(d, "WARNING: key replaced outside pairing mode");
+                ask_approval(d, "device paired with a new key");
                 give_up_on(d, "key replaced outside pairing mode", 0);
                 return 0;
+            }
+            if (now_tag != d->key_tag && peers_only) {
+                EVT(d, "new key accepted (approved by the user)");
+                approved.until_us = 0;
+                *refusals_of(&d->addr) = 0;
             }
             EVT(d, "encryption changed again (%s)", now_tag == d->key_tag ? "same key" : "new key, pairing mode");
             d->key_tag = now_tag;
@@ -1532,9 +1909,10 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         // The device wants to pair although we hold a bond for it. Replacing
         // the bond is only allowed in pairing mode (see PINKEY_MISSING above).
         d = dev_by_handle(event->repeat_pairing.conn_handle);
-        if (peers_only) {
+        if (peers_only && (d == NULL || !approved_for(&d->addr))) {
             if (d != NULL) {
-                give_up_on(d, "device asked to pair again; press Pair new device to allow it", 0);
+                ask_approval(d, "device asked to pair again");
+                give_up_on(d, "device asked to pair again; press the button (or Pair new device) to allow it", 0);
             }
             return BLE_GAP_REPEAT_PAIRING_IGNORE;
         }
@@ -1604,10 +1982,21 @@ static void on_sync(void) {
     int n = 0;
     ble_store_util_bonded_peers(peers, &n, CONFIG_BT_NIMBLE_MAX_BONDS);
     peers_only = n > 0; // nothing bonded yet: accept any HID device, as upstream
+    pairing_since_us = peers_only ? 0 : esp_timer_get_time();
     olog("M1 EVT t=%.3f ble ready bonds=%d\n", now_s(), n);
     for (int i = 0; i < n; i++) {
         olog("M1 EVT t=%.3f bond %d addr=..:%02x:%02x kind=%s\n", now_s(), i + 1, peers[i].val[1], peers[i].val[0],
              addr_kind(&peers[i]));
+    }
+    orbit_ledger_sync_bonds(peers, n);
+    orbit_ledger_row_t row;
+    for (int i = 0; orbit_ledger_nth(i, &row); i++) {
+        char name[64];
+        orbit_ledger_display_name(&row, name, sizeof(name));
+        olog("M1 LDG t=%.3f port=%d addr=..:%02x:%02x %s key=%s kind=%s vid=%04x pid=%04x hash=%08x last=%lu \"%s\"\n",
+             now_s(), row.port, row.addr.val[1], row.addr.val[0], addr_kind(&row.addr),
+             (row.flags & ORBIT_LEDGER_NO_KEY) ? "none" : "yes", orbit_ledger_kind_name(row.kind), row.vid, row.pid,
+             (unsigned) row.map_hash, (unsigned long) row.last_used, name);
     }
     schedule();
 }
@@ -1654,6 +2043,9 @@ void orbit_ble_start(TaskHandle_t wake) {
     ble_npl_event_init(&pair_ev, pair_new_device_ev, NULL);
     ble_npl_event_init(&stop_pair_ev, stop_pairing_ev, NULL);
     ble_npl_event_init(&clear_bonds_ev, clear_bonds_on_host, NULL);
+    ble_npl_event_init(&cmd_ev, run_commands, NULL);
+    ble_npl_event_init(&approve_ev, approve_ev_fn, NULL);
+    cmd_q = xQueueCreate(8, sizeof(cmd_t));
     ble_npl_callout_init(&resume_co, nimble_port_get_dflt_eventq(), resume, NULL);
     nimble_port_freertos_init(host_task);
 }
@@ -1695,6 +2087,63 @@ void orbit_ble_stop_pairing(void) {
     ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &stop_pair_ev);
 }
 
+static void post_command(cmd_t c) {
+    if (xQueueSend(cmd_q, &c, 0) == pdTRUE) {
+        ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &cmd_ev);
+    }
+}
+
+void orbit_ble_forget(int port) {
+    post_command((cmd_t) { .kind = CMD_FORGET, .a = port });
+}
+
+void orbit_ble_move(int new_port, int old_port) {
+    post_command((cmd_t) { .kind = CMD_MOVE, .a = new_port, .b = old_port });
+}
+
+void orbit_ble_approve(void) {
+    ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &approve_ev);
+}
+
+void orbit_ble_approval(orbit_approval_t* out) {
+    int64_t now = esp_timer_get_time();
+    memset(out, 0, sizeof(*out));
+    out->wanted = approval.wanted;
+    if (approval.wanted) {
+        out->port = approval.port;
+        out->reason = approval.reason;
+        int64_t left = APPROVAL_PROMPT_US - (now - approval.since_us);
+        out->remaining_s = left > 0 ? (int) (left / 1000000) : 0;
+    }
+    if (approved.until_us > now) {
+        out->granted_port = orbit_ledger_port(&approved.addr);
+        out->granted_remaining_s = (int) ((approved.until_us - now) / 1000000);
+    }
+}
+
+int orbit_ble_slot_port(int slot) {
+    return devs[slot].connected ? orbit_ledger_port(&devs[slot].addr) : 0;
+}
+
+bool orbit_ble_duplicates(void) {
+    return duplicates_seen;
+}
+
+bool orbit_ble_bonds_full(void) {
+    return bonds_full_seen;
+}
+
+int orbit_ble_pairing_remaining_s(void) {
+    if (peers_only) {
+        return 0;
+    }
+    if (pairing_since_us == 0 || orbit_ledger_count() == 0) {
+        return -1; // no end
+    }
+    int64_t left = PAIRING_TIMEOUT_US - (esp_timer_get_time() - pairing_since_us);
+    return left > 0 ? (int) (left / 1000000) : 0;
+}
+
 void orbit_ble_take_stats(int i, orbit_dev_stats_t* out) {
     dev_t* d = &devs[i];
     portENTER_CRITICAL(&stats_mux);
@@ -1713,6 +2162,7 @@ void orbit_ble_take_stats(int i, orbit_dev_stats_t* out) {
     d->max_gap_us = 0;
     memset(d->gaps, 0, sizeof(d->gaps));
     portEXIT_CRITICAL(&stats_mux);
+    out->port = out->connected ? orbit_ledger_port(&d->addr) : 0;
 }
 
 int orbit_ble_connected_count(void) {

@@ -29,7 +29,7 @@ typedef struct {
 
 typedef struct {
     uint16_t interface;
-    uint8_t hub_port;   // 1-based position in the bond list, as upstream; 0 if not bonded
+    uint8_t hub_port;   // the device's ledger port (1..15); 0 when it has no row
     uint16_t len;
     uint8_t data[ORBIT_REPORT_MAP_MAX];
 } orbit_report_map_t;
@@ -45,6 +45,7 @@ typedef struct {
     bool connected;
     uint16_t conn_handle;
     uint8_t addr_lo[2]; // lowest two address bytes, [0] = least significant
+    int port;           // ledger port (0: none)
     bool encrypted;
     int subscribed;     // input Report characteristics with notifications on
     uint32_t reports;   // reports in this window
@@ -75,6 +76,25 @@ void orbit_ble_clear_bonds(void);
 // Back to bonded devices only, without waiting for a pairing (button, G-5).
 // Stays in pairing mode when nothing is bonded, as there is nothing to wait for.
 void orbit_ble_stop_pairing(void);
+// Ledger management (M2 2a). Run on the host task; safe from any task.
+void orbit_ble_forget(int port);              // drop the device's bond, row and link
+void orbit_ble_move(int new_port, int old_port); // the device on new_port takes over old_port
+bool orbit_ble_bonds_full(void);              // a pairing was refused because all 15 ports are taken
+bool orbit_ble_duplicates(void);              // two or more ledger rows look like one device; the user picks
+int orbit_ble_slot_port(int slot);            // ledger port of the device connected on slot, 0 when none
+
+// Requirement G: a bonded device asking to pair again outside pairing mode.
+typedef struct {
+    bool wanted;         // a question is open (G-1)
+    int port;            // which device
+    const char* reason;
+    int remaining_s;     // seconds left to answer
+    int granted_port;    // 0, or the port that may pair again now (G-2)
+    int granted_remaining_s;
+} orbit_approval_t;
+void orbit_ble_approve(void); // answer the open question: let that device pair again
+void orbit_ble_approval(orbit_approval_t* out);
+int orbit_ble_pairing_remaining_s(void);      // seconds left in pairing mode; 0 when not pairing, -1 when open-ended
 
 // Copies device slot i and starts a new report window for it.
 void orbit_ble_take_stats(int i, orbit_dev_stats_t* out);

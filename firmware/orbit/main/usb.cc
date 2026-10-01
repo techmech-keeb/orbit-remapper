@@ -21,6 +21,7 @@
 
 #include "log.h"
 #include "orbit.h"
+#include "tool.h"
 
 // Upstream's IDs, so that the web config tool finds the device (M1). Orbit's
 // own IDs are an open question.
@@ -198,7 +199,8 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
     if (itf == 0) {
         return handle_get_report0(report_id, buffer, reqlen);
     } else {
-        return handle_get_report1(report_id, buffer, reqlen);
+        uint16_t n = orbit_tool_get_report(buffer, reqlen); // Orbit's own commands first (tool.h)
+        return n != 0 ? n : handle_get_report1(report_id, buffer, reqlen);
     }
 }
 
@@ -209,7 +211,7 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
             buffer++;
         }
         handle_set_report0(report_id, buffer, bufsize);
-    } else {
+    } else if (!orbit_tool_set_report(buffer, bufsize)) {
         handle_set_report1(report_id, buffer, bufsize);
     }
 }
