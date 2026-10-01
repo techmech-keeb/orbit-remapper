@@ -2,6 +2,10 @@
 
 初代 M5Dial（ESP32-S3）1 台で、Bluetooth のキーボードやマウスを受け取り、[HID Remapper](https://github.com/jfedor2/hid-remapper) のコアでリマップして、USB で PC に出す卓上リマッパーです。丸い画面とダイヤルで、つながっている機器の状態を見たり、ペアリングを管理したりできます。
 
+![初代 M5Dial の画面。緑のリングの内側に「ORBIT 3/15」、IST TrackBall（P1、7.50 ms）と MISTEL-1（P3、7.50 ms）の 2 枚のカード、「2 devices connected」、「USB mounted e72c27a」が表示されている。右にトラックボール、奥にキーボード](docs/images/orbit-m5dial-2026-10.jpg)
+
+*初代 M5Dial で IST Trackball と Mistel MD600 をつないだところ（版 `e72c27a`、2026-10）。*
+
 Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本家から派生した独立プロジェクトで、本家の公式モデルや承認済みの製品ではありません。
 
 **開発中です。** 動作は作者の手元の機器（IST Trackball、Cube Turner PRO、Mistel MD600 など）で確かめた範囲に限られます。製品として完成したものではありません。
@@ -48,7 +52,7 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 | --- | --- |
 | ソフトウェア（ファームウェア、ツール、CAD・描画の生成スクリプト） | [MIT License](LICENSE) |
 | ハードウェア設計（STEP、DXF、今後の基板データ） | [CERN Open Hardware Licence Version 2 - Permissive](LICENSE-HARDWARE)（CERN-OHL-P-2.0） |
-| 文書（`docs/` と各 README） | [Creative Commons Attribution 4.0 International](LICENSE-DOCS)（CC BY 4.0） |
+| 文書と画像（`docs/` と各 README、`docs/images/` の写真） | [Creative Commons Attribution 4.0 International](LICENSE-DOCS)（CC BY 4.0） |
 | 本家 HID Remapper のコード（`firmware/hid-remapper/`） | 本家の [MIT License](firmware/hid-remapper/LICENSE)（Copyright (c) 2023 Jacek Fedorynski）。一部のファイルは各自の表示に従う |
 | ビルド時に取得する部品（ESP-IDF、NimBLE、TinyUSB、LVGL など） | 各部品のライセンス。このリポジトリには含めない |
 | 第三者の素材（メーカーの写真、寸法図、フォント） | このリポジトリには含めない。出典のリンクだけを残す |
