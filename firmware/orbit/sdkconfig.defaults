@@ -36,3 +36,17 @@ CONFIG_BT_NIMBLE_LOG_LEVEL_WARNING=y
 # run alongside ble.c's reconnect, which already handles the disconnect
 # (ble-connect-prior-art.md §4). Only ble.c starts connections.
 CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT=n
+
+# Screen (M3): LVGL uses the system heap, not its own 64 KB pool; the fonts
+# ui.c uses; a 16-bit colour depth for the GC9A01.
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CLIB_STRING=y
+CONFIG_LV_USE_CLIB_SPRINTF=y
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_FONT_MONTSERRAT_12=y
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_DEFAULT_MONTSERRAT_14=y
+# Redraw at most every 50 ms; the screen changes once a second anyway.
+CONFIG_LV_DEF_REFR_PERIOD=50

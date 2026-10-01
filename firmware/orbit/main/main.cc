@@ -36,6 +36,7 @@
 #include "storage.h"
 #include "ledger.h"
 #include "commands.h"
+#include "ui.h"
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
 #define PIN_BUTTON     42 // screen push button, low when pressed
@@ -49,6 +50,7 @@ static TaskHandle_t main_task;
 static std::atomic<bool> tick_pending(false);
 static std::atomic<const char*> download_mode_reason(nullptr);
 static void* lvgl_reserve;
+static bool ui_ready; // LVGL owns the panel (ui.c); else the text screen (display.c)
 
 double orbit_now_s() {
     return esp_timer_get_time() / 1e6;
@@ -118,7 +120,7 @@ static void print_start() {
          "max_devs=%d conn_itvl=6(7.50ms) lvgl_reserve=%s\n",
          esp_get_idf_version(), esp_app_get_description()->version, ORBIT_UPSTREAM_COMMIT,
          PERSISTED_CONFIG_SIZE, our_descriptor_number, 0xCAFE, 0xBAF2, ORBIT_MAX_DEVS,
-         lvgl_reserve ? "ok" : "FAILED");
+         ui_ready ? "lvgl" : "text");
 }
 
 // Upstream ticks the core once per millisecond (decision I2: esp_timer).
@@ -193,16 +195,52 @@ static void status_task(void* arg) {
                  orbit_ble_pairing() ? "PAIRING" : orbit_ble_scanning() ? "SCAN" : orbit_ble_waiting() ? "WAIT" : "IDLE",
                  conn, ORBIT_MAX_DEVS);
         orbit_commands_log_state(t);
+        orbit_ui_state_t ui = {};
         orbit_dev_stats_t st;
         for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
             orbit_ble_take_stats(i, &st);
             report_device(i, t, &st, &lines[4 + i * 2]);
+            orbit_ui_dev_t* d = &ui.dev[i];
+            d->connected = st.connected;
+            d->port = st.port;
+            d->encrypted = st.encrypted;
+            d->subscribed = st.subscribed;
+            d->reports = st.reports;
+            d->disconnects = st.disconnects;
+            if (st.connected) {
+                ble_gap_conn_desc desc = {};
+                ble_gap_conn_find(st.conn_handle, &desc);
+                d->itvl_ms = desc.conn_itvl * 1.25;
+                d->latency = desc.conn_latency;
+                orbit_ledger_row_t row;
+                if (st.port != 0 && orbit_ledger_get(st.port, &row)) {
+                    orbit_ledger_display_name(&row, d->name, sizeof(d->name));
+                } else {
+                    snprintf(d->name, sizeof(d->name), "..:%02x:%02x", st.addr_lo[1], st.addr_lo[0]);
+                }
+            }
         }
+        ui.devices = orbit_ledger_count();
+        ui.max_devices = ORBIT_LEDGER_MAX;
+        ui.pairing = orbit_ble_pairing();
+        ui.pairing_remaining_s = orbit_ble_pairing_remaining_s();
+        ui.full = orbit_ble_bonds_full();
+        ui.duplicates = orbit_ble_duplicates();
+        orbit_ble_approval(&ui.approval);
+        ui.usb = !mounted ? "none" : susp ? "suspended" : "mounted";
+        ui.boot_protocol = boot_protocol_keyboard;
+        ui.heap_free = heap_free;
+        ui.heap_min = heap_min;
+        ui.version = esp_app_get_description()->version;
 
         portENTER_CRITICAL(&lat_mux);
         auto l = lat;
         lat = {};
         portEXIT_CRITICAL(&lat_mux);
+        if (l.count > 0) {
+            ui.lat_avg_ms = l.sum_us / 1000.0 / l.count;
+            ui.lat_max_ms = l.max_us / 1000.0;
+        }
         if (l.count > 0 || l.unrelated > 0) {
             olog("M1 LAT t=%.0f n=%lu avg=%.2fms max=%.2fms <=8/<=16/>16=%lu/%lu/%lu unrelated=%lu\n", t,
                  (unsigned long) l.count, l.count ? l.sum_us / 1000.0 / l.count : 0.0, l.max_us / 1000.0,
@@ -219,11 +257,20 @@ static void status_task(void* arg) {
         char ev[DISPLAY_COLS + 1];
         orbit_ble_last_event(ev, sizeof(ev));
         set_line(&lines[11], GREY, "%s", ev);
-        display_show(lines);
+        snprintf(ui.last_event, sizeof(ui.last_event), "%s", ev);
+        if (ui_ready) {
+            orbit_ui_update(&ui); // LVGL owns the panel now
+        } else {
+            display_show(lines);
+        }
     }
 }
 
 static void show_download_mode() {
+    if (ui_ready) {
+        orbit_ui_message("DOWNLOAD MODE", "ready to flash");
+        return;
+    }
     display_line_t lines[DISPLAY_ROWS] = {};
     set_line(&lines[5], YELLOW, "DOWNLOAD MODE");
     set_line(&lines[7], WHITE, "READY TO FLASH");
@@ -324,7 +371,11 @@ static void main_loop(void* arg) {
                 int64_t held_ms = (esp_timer_get_time() - button_down_us) / 1000;
                 olog("M1 EVT t=%.3f button released after %lld ms\n", orbit_now_s(), (long long) held_ms);
                 if (held_ms >= 30) {
-                    orbit_ble_approve(); // G-2: a short press answers an open approval question
+                    if (ui_ready) {
+                        orbit_ui_press(); // the screen answers a question or opens its menu
+                    } else {
+                        orbit_ble_approve(); // G-2: a short press answers an open approval question
+                    }
                 }
             } else {
                 olog("M1 EVT t=%.3f button released after the %d ms hold\n", orbit_now_s(), BUTTON_HOLD_MS);
@@ -386,6 +437,10 @@ extern "C" void app_main() {
     set_mapping_from_config();
 
     display_init();
+    // Decision I3: the 48 KB kept since M1 now goes to LVGL's draw buffers.
+    heap_caps_free(lvgl_reserve);
+    lvgl_reserve = NULL;
+    ui_ready = orbit_ui_init();
     orbit_log_init(print_start);
     print_start();
     olog("M1 EVT t=%.3f config loaded from NVS err=0x%x%s\n", orbit_now_s(), cfg_err,

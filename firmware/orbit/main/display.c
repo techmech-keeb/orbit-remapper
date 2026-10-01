@@ -31,6 +31,7 @@
 
 static const char *TAG = "display";
 static esp_lcd_panel_handle_t panel;
+static esp_lcd_panel_io_handle_t panel_io;
 static uint16_t *band;
 static SemaphoreHandle_t band_free;
 
@@ -56,7 +57,7 @@ void display_init(void)
         .sclk_io_num = PIN_SCLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = LCD_W * CELL_H * sizeof(uint16_t),
+        .max_transfer_sz = LCD_W * 40 * sizeof(uint16_t), // LVGL's draw buffer (ui.c) is the larger user
     };
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &bus, SPI_DMA_CH_AUTO));
 
@@ -72,6 +73,7 @@ void display_init(void)
         .on_color_trans_done = on_trans_done,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_cfg, &io));
+    panel_io = io;
 
     const esp_lcd_panel_dev_config_t panel_cfg = {
         .reset_gpio_num = PIN_RST,
@@ -91,6 +93,21 @@ void display_init(void)
     gpio_set_level(PIN_BL, 1);
 
     xSemaphoreGive(band_free);
+}
+
+esp_lcd_panel_handle_t display_panel(void)
+{
+    return panel;
+}
+
+esp_lcd_panel_io_handle_t display_io(void)
+{
+    return panel_io;
+}
+
+void display_backlight(bool on)
+{
+    gpio_set_level(PIN_BL, on ? 1 : 0);
 }
 
 static void draw_band(int y0, int h, const display_line_t *line)

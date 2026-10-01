@@ -5,3 +5,6 @@ dependencies:
   espressif/tinyusb: "0.21.0~2"
   # GC9A01 panel driver for the status screen (Apache-2.0).
   espressif/esp_lcd_gc9a01: "^2.0.0"
+  # Screen (M3). LVGL is MIT, esp_lvgl_port Apache-2.0.
+  lvgl/lvgl: "^9.2.0"
+  espressif/esp_lvgl_port: "^2.4.0"
