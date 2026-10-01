@@ -1,56 +1,54 @@
-# Orbit Remapper — DRAFT
+# Orbit Remapper
 
-HID Remapperを基盤に、画面と操作部を備えた卓上リマッパーを検討するプロジェクトです。
+初代 M5Dial（ESP32-S3）1 台で、Bluetooth のキーボードやマウスを受け取り、[HID Remapper](https://github.com/jfedor2/hid-remapper) のコアでリマップして、USB で PC に出す卓上リマッパーです。丸い画面とダイヤルで、つながっている機器の状態を見たり、ペアリングを管理したりできます。
 
-**現在は設計・開発検討のドラフトです。完成品、動作確認済みファーム、製造承認済みデータの公開ではありません。**
+Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本家から派生した独立プロジェクトで、本家の公式モデルや承認済みの製品ではありません。
 
-Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2.
-本家から派生した独立プロジェクトとして検討しています。本家の公式モデル・承認済み製品ではありません。
+**開発中です。** 動作は作者の手元の機器（IST Trackball、Cube Turner PRO、Mistel MD600 など）で確かめた範囲に限られます。製品として完成したものではありません。
 
-## まず読む
+## できること（2026-10 時点）
 
-- [ドラフト資料の入口](docs/drafts/2026-09-26/README.md)
-- [要求と決定状況](docs/drafts/2026-09-26/requirements.md)
-- [デザイン・構成の検討経緯](docs/drafts/2026-09-26/history.md)
-- [E1 / M5Dial / S3の構成比較](docs/drafts/2026-09-26/architecture.md)
-- [未解決事項と確定条件](docs/drafts/2026-09-26/open-questions.md)
-- [成果物一覧と原本の位置づけ](docs/drafts/2026-09-26/artifacts.md)
+- Bluetooth LE の HID 機器を同時に 2 台、7.5 ms の間隔で受け取る。
+- 本家 HID Remapper のコア（無改造）でリマップする。設定は本家の Web 設定ツール（https://www.remapper.org/config/ ）でそのまま行える。
+- 機器ごとに固定のポート番号を振る台帳。1 台ずつの削除、上限 15 台、アドレスが変わった機器の引き継ぎ。
+- 登録済みの機器が組み直しを求めたときは、本体で許可するまでつながない。
+- 画面：状態の色のリング、機器のカード、ダイヤルで操作するメニュー（ペアリング、削除、画面の回転、画面を消すまでの時間）。
 
-## 構成
+これからの予定（機器ごとのレイヤー、切断時の押しっぱなしの解除、設定セット、LED の送り返し）は [M2 の依頼書](docs/drafts/2026-09-30/m2-brief.md) にあります。
 
-| 構成 | 状態 |
-| --- | --- |
-| XIAO nRF52840 Plus（本家 BLE 版で BLE 受信・リマップ・PC への USB 出力）＋初代 M5Dial（画面とダイヤル） | **2026-09-26 採用。** 入力は BLE 機器のみ（同時 2 台、7.5 ms を目指す。当初 4 台から変更）。有線 USB 機器は対象外。透過表示の要件（R02）は取り下げ。ファーム、筐体は未着手・未検証。 |
-| M5Dial 単体（ESP32-S3 が BLE 受信・リマップ・画面操作・PC への USB 出力） | 同日に検討し、4 台・7.5 ms の要件から XIAO＋M5Dial に置き換え。その後 2 台に下げたため、実験次第で再評価の余地あり（Q31）。 |
-| M5Dial + XIAO（S3がUIとUSBホストを兼任） | 同日に検討し、M5Dial 単体の構成に置き換え。 |
-| E1 Orbital Pod + Glass2 + XIAO + Pico | 機構試作案v0.3のCAD等を経緯として保存。現行の構成ではない。 |
+## 使い方と作り方
 
-## リポジトリ
+- ファームウェアのビルド、書き込み、ログの読み方：[firmware/orbit/README.md](firmware/orbit/README.md)
+- 取り込んだ本家のコードと版：[firmware/hid-remapper/UPSTREAM.md](firmware/hid-remapper/UPSTREAM.md)
 
-- [orbit-remapper](https://github.com/techmech-keeb/orbit-remapper): 製品全体の資料・独自開発を置く場所。
-- [hid-remapper](https://github.com/techmech-keeb/hid-remapper): 本家由来コードの開発先。
+## 資料
 
-この資料追加では、HID Remapper側のコード変更は行っていません。
-名称はリポジトリ名として使用していますが、正式なブランド確定・商標確認を済ませた意味ではありません。
+開発の記録は `docs/drafts/` にあります。日付ごとのフォルダで、確定版ではありません。
 
-## ドラフトの扱い
+- [要件と決定](docs/drafts/2026-09-26/requirements.md)
+- [実装の設計](docs/drafts/2026-09-27/implementation-design.md)
+- [M1 の結果](docs/drafts/2026-09-27/m1-results.md)、[M2 の結果](docs/drafts/2026-09-30/m2-results.md)
+- [画面（M3）](docs/drafts/2026-10-01/m3-screen.md)
+- [未解決事項](docs/drafts/2026-09-26/open-questions.md)
+- [設計の経緯](docs/drafts/2026-09-26/history.md)
+- 実機の試験の報告：`docs/drafts/2026-09-27/reports/`
 
-2026-09-26に、一定の完成度に達するまで非公開で開発する方針へ変更しました。この資料の格納先 `orbit-remapper` はprivateです。`hid-remapper` は現在publicなので、独自の未公開実装は追加せず、そちらの開発開始前に非公開の作業先を用意します。公開時期・公開範囲は未確定です。
+当初の筐体案（E1）の CAD と検査記録は `artifacts/drafts/` に経緯として残しています。今の構成ではありません。
 
-将来はオープンソースとして公開する前提です。そのため、このリポジトリの履歴には公開できる物だけを入れます。非公開の原本（元BOM、引き継ぎ文書など）は別の private リポジトリに置き、第三者の素材は出典のリンクだけを残します（[成果物一覧](docs/drafts/2026-09-26/artifacts.md)）。
+## 注意
 
-検討資料は `docs/drafts/`、当時の成果物は `artifacts/drafts/` に保存します。
-ユーザーが内容を確定した後、対象文書ごとに確定版へ整理します。Draft PRのマージと、製品仕様・製造承認は別の判断です。
+- **PR の番号**：資料に出てくる「PR #16」などの番号は、2026-10-02 に公開するまで使っていた非公開の開発リポジトリのものです。このリポジトリの PR とは対応しません。そのころの変更は、`main` の履歴のマージコミット（「Merge pull request #16 …」）でたどれます。
+- **USB の VID/PID と製品名**：今は本家の Web 設定ツールをそのまま使うため、本家と同じ `0xCAFE` / `0xBAF2` と「HID Remapper Bluetooth」という製品名を名乗ります。正式な割り当てではありません（[Q35](docs/drafts/2026-09-26/open-questions.md)）。
+- **名前**：「Orbit」はリポジトリ名として使っているだけで、商標の確認はしていません。
+- **ログ**：ファームウェアのログには、機器のアドレスの下位 2 バイトだけを出します。ペアリングの鍵や M5Dial の MAC アドレスは出しません。
 
 ## ライセンス
 
-公開前のため、対象ごとのライセンスはまだ確定していません。
-
 | 対象 | ライセンス |
 | --- | --- |
-| ソフトウェア（CAD・描画の生成スクリプト、今後のファームウェア・ツール） | [MIT License](LICENSE) |
-| ハードウェア設計（STEP、DXF、今後の基板データ） | 未確定（CC BY 4.0 または CERN-OHL-P を検討） |
-| 文書 | 未確定（CC BY 4.0 を検討） |
-| 第三者の素材 | 各権利者のライセンスに従う。このリポジトリには含めない |
-
-HID Remapper 由来のコードを取り込む場合は、本家の著作権表示（Copyright (c) 2023 Jacek Fedorynski）と MIT License の条文を残します。
+| ソフトウェア（ファームウェア、ツール、CAD・描画の生成スクリプト） | [MIT License](LICENSE) |
+| ハードウェア設計（STEP、DXF、今後の基板データ） | [CERN Open Hardware Licence Version 2 - Permissive](LICENSE-HARDWARE)（CERN-OHL-P-2.0） |
+| 文書（`docs/` と各 README） | [Creative Commons Attribution 4.0 International](LICENSE-DOCS)（CC BY 4.0） |
+| 本家 HID Remapper のコード（`firmware/hid-remapper/`） | 本家の [MIT License](firmware/hid-remapper/LICENSE)（Copyright (c) 2023 Jacek Fedorynski）。一部のファイルは各自の表示に従う |
+| ビルド時に取得する部品（ESP-IDF、NimBLE、TinyUSB、LVGL など） | 各部品のライセンス。このリポジトリには含めない |
+| 第三者の素材（メーカーの写真、寸法図、フォント） | このリポジトリには含めない。出典のリンクだけを残す |

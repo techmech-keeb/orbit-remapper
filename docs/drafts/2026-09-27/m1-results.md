@@ -6,7 +6,7 @@ finalized: false
 
 # M1 の結果：本家 HID Remapper を M5Dial で動かす
 
-依頼書 [m1-brief.md](m1-brief.md) §5 の合格条件を、初代 M5Dial と利用者の PC（Windows 11）で確かめた記録。**つなぎ方の訂正（2026-09-29、利用者）**：9 月 28 日以降の試験（`8061951` 以降）はすべて USB ハブ（Genesys GL850、VID 05E3 / PID 0608）経由だった。9 月 27 日の `3662016`・`728105c` は報告どおり PC 本体のポートと、ハブ経由の両方を試した。9 月 27 日夜の `1e37eea`・`86a2d16`・`6254d16` はどちらだったか分からない。機器は Mistel MD600 Alpha（キーボード）と meteorite40（トラックボール付きキーボード）。実装は `firmware/orbit/`（PR [techmech-keeb/orbit-remapper#9](https://github.com/techmech-keeb/orbit-remapper/pull/9)）。事実（ログで見た値）と推測を分けて書く。ログの全文は利用者の PC にだけある。
+依頼書 [m1-brief.md](m1-brief.md) §5 の合格条件を、初代 M5Dial と利用者の PC（Windows 11）で確かめた記録。**つなぎ方の訂正（2026-09-29、利用者）**：9 月 28 日以降の試験（`8061951` 以降）はすべて USB ハブ（Genesys GL850、VID 05E3 / PID 0608）経由だった。9 月 27 日の `3662016`・`728105c` は報告どおり PC 本体のポートと、ハブ経由の両方を試した。9 月 27 日夜の `1e37eea`・`86a2d16`・`6254d16` はどちらだったか分からない。機器は Mistel MD600 Alpha（キーボード）と meteorite40（トラックボール付きキーボード）。実装は `firmware/orbit/`（PR techmech-keeb/orbit-remapper#9（マージ `d55d85a`））。事実（ログで見た値）と推測を分けて書く。ログの全文は利用者の PC にだけある。
 
 ## 1. 結論
 
