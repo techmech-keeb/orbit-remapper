@@ -35,10 +35,21 @@
 #define UUID_MANUFACTURER 0x2A29
 #define UUID_PNP_ID       0x2A50
 
+#define UUID_BATTERY_SERVICE 0x180F
+#define UUID_BATTERY_LEVEL   0x2A19
+#define UUID_USER_DESC       0x2901
+#define UUID_PRESENTATION    0x2904
+
 #define REPORT_TYPE_INPUT 1
 
 #define MAX_HID_SVCS 2
 #define MAX_CHRS     32
+#define MAX_BAT      4 // Battery Level characteristics per device (a split keyboard has one per half)
+#define BAT_REREAD_US (600LL * 1000000) // levels without notifications are read again this often
+#define BAT_QUIET_US  (1 * 1000000)     // ... once the device's input has paused this long
+#define BAT_LOW       10                // % at or below which the screen says so, once
+#define BAT_LOW_CLEAR 15                // % from which a later drop is told again (charged)
+#define BAT_NOTICE_US (60 * 1000000)    // how long the screen shows that notice
 #define CONNECT_TIMEOUT_MS 10000 // one direct connect, or one round of accept-list waiting
 #define RECONNECT_HOLD_MS 500     // pause after a disconnect before the next attempt (RMK, upstream BLE)
 // While waiting for bonded devices the controller listens 30 ms out of
@@ -112,6 +123,14 @@ typedef struct {
     uint8_t report_type;
 } chr_t;
 
+typedef struct {
+    uint16_t def_handle, val_handle, end_handle;
+    uint16_t cccd_handle, user_desc_handle, presentation_handle;
+    uint8_t props;
+    bool notifying;
+    uint8_t level; // %, ORBIT_BATTERY_UNKNOWN until read (written under stats_mux)
+} bat_chr_t;
+
 typedef struct dev dev_t;
 
 // Handed to NimBLE as the callback argument of every GATT procedure. A
@@ -163,6 +182,20 @@ struct dev {
     bool map_pending; // report map held back until the ledger row is settled (new device)
     uint32_t map_hash;
 
+    // Battery Service, probed after the device information. Levels come
+    // from notifications where the device offers them, else from a read
+    // every BAT_REREAD_US. Notifications on these handles are not input
+    // reports. Memory only: a new link starts unknown.
+    bool bat_started;
+    int bat_phase;
+    uint16_t bat_svc_start[MAX_BAT], bat_svc_end[MAX_BAT];
+    int bat_n_svcs;
+    bat_chr_t bat[MAX_BAT];
+    int bat_n;
+    int bat_cur; // service while finding characteristics, then characteristic
+    int64_t bat_read_us; // last read of the levels without notifications (0: nothing to read again)
+    bool bat_low_told;   // the low notice went out for this link
+
     // Report statistics
     int64_t last_report_us;
     uint32_t reports;
@@ -199,6 +232,13 @@ static dev_t* gatt_ctx_dev(void* arg, uint16_t conn_handle) {
 static const char* TAG = "ble";
 static dev_t devs[ORBIT_MAX_DEVS];
 static portMUX_TYPE stats_mux = portMUX_INITIALIZER_UNLOCKED;
+
+// The latest battery-low notice, for the screen (under stats_mux).
+static struct {
+    int port;
+    uint8_t level;
+    int64_t at_us;
+} bat_notice;
 static uint8_t own_addr_type;
 static bool connecting;      // a direct connect to a scanned device is in flight
 static bool wl_waiting;      // the controller is waiting for any bonded device (accept list)
@@ -219,7 +259,7 @@ static bool bonds_full_seen;     // a pairing was refused because the ledger is 
 
 // Ledger commands from other tasks (config tool, serial), run on the host task.
 typedef struct {
-    enum { CMD_FORGET, CMD_MOVE } kind;
+    enum { CMD_FORGET, CMD_MOVE, CMD_BATTERY_TEST } kind;
     int a, b;
 } cmd_t;
 static QueueHandle_t cmd_q;
@@ -711,6 +751,8 @@ static void resume(struct ble_npl_event* ev) {
     schedule();
 }
 
+static void bat_reread_if_due(dev_t* d, int64_t now);
+
 static void periodic_check(struct ble_npl_event* ev) {
     int64_t now = esp_timer_get_time();
 
@@ -750,6 +792,7 @@ static void periodic_check(struct ble_npl_event* ev) {
 
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         dev_t* d = &devs[i];
+        bat_reread_if_due(d, now);
         if (d->connected && d->sec_pending) {
             int rc = ble_gap_security_initiate(d->conn_handle);
             if (rc == 0 || rc == BLE_HS_EALREADY) {
@@ -951,6 +994,8 @@ static void restart_wait(void) {
     }
 }
 
+static void bat_set_level(dev_t* d, int i, const uint8_t* v, int len);
+
 static void run_commands(struct ble_npl_event* ev) {
     cmd_t c;
     while (xQueueReceive(cmd_q, &c, 0) == pdTRUE) {
@@ -985,6 +1030,27 @@ static void run_commands(struct ble_npl_event* ev) {
             drop_links_of(&row.addr, "port changed");
             restart_wait();
             break;
+        case CMD_BATTERY_TEST: {
+            // Pretends the device on port a reported level b, until its next
+            // real read or notification (checks the colours and the notice).
+            dev_t* d = NULL;
+            for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+                if (devs[i].connected && c.a != 0 && orbit_ledger_port(&devs[i].addr) == c.a) {
+                    d = &devs[i];
+                }
+            }
+            if (d == NULL || d->bat_n == 0 || c.b < 0 || c.b > 100) {
+                olog("M1 EVT t=%.3f battery test: port %d level %d not valid (connected, with a Battery Level, 0..100)\n",
+                     now_s(), c.a, c.b);
+                break;
+            }
+            EVT(d, "battery test: level=%d%% on all %d characteristic(s), until the next real value", c.b, d->bat_n);
+            uint8_t v = (uint8_t) c.b;
+            for (int i = 0; i < d->bat_n; i++) {
+                bat_set_level(d, i, &v, 1);
+            }
+            break;
+        }
         }
     }
 }
@@ -1241,9 +1307,12 @@ static void info_done(dev_t* d) {
     }
 }
 
+static void bat_start(dev_t* d);
+
 static void read_next_info(dev_t* d) {
     if (d->info_step >= (int) (sizeof(info_reads) / sizeof(info_reads[0]))) {
         info_done(d);
+        bat_start(d);
         return;
     }
     int rc = ble_gattc_read_by_uuid(d->conn_handle, 1, 0xFFFF, BLE_UUID16_DECLARE(info_reads[d->info_step].uuid),
@@ -1537,10 +1606,372 @@ static void start_discovery(dev_t* d) {
     }
 }
 
+// ---- Battery Service ----
+//
+// The probe runs once per link, after the device information, so that
+// input flows first. One GATT procedure at a time, as everywhere here. For
+// each Battery Level characteristic: its descriptors, its value, its User
+// Description and Presentation Format (how a split keyboard tells its
+// halves apart), then notifications when its properties offer them. A CCCD
+// alone is not enough: the IST Trackball has one on a characteristic that
+// does not notify (bat0-8153e8b report), and writing it would ask for
+// something the device did not declare. Levels without notifications are
+// read again every BAT_REREAD_US, during a pause in the device's input
+// (periodic_check). The screen and the tools see the lowest level of a
+// device, the half that runs out first.
+
+enum { BAT_SVCS, BAT_CHRS, BAT_DSCS, BAT_LEVEL, BAT_USER_DESC, BAT_PRESENTATION, BAT_CCCD, BAT_DONE, BAT_REREAD };
+
+static void bat_next(dev_t* d);
+
+static bool bat_pollable(const bat_chr_t* b) {
+    return (b->props & BLE_GATT_CHR_PROP_READ) && !b->notifying;
+}
+
+// Lowest known level of d, or ORBIT_BATTERY_UNKNOWN.
+static uint8_t bat_lowest(const dev_t* d) {
+    uint8_t low = ORBIT_BATTERY_UNKNOWN;
+    for (int i = 0; i < d->bat_n; i++) {
+        if (d->bat[i].level < low) {
+            low = d->bat[i].level;
+        }
+    }
+    return low;
+}
+
+// Keeps the level of characteristic i (out-of-range values count as
+// unknown) and tells the screen once when the device runs low.
+static void bat_set_level(dev_t* d, int i, const uint8_t* v, int len) {
+    uint8_t level = len > 0 && v[0] <= 100 ? v[0] : ORBIT_BATTERY_UNKNOWN;
+    portENTER_CRITICAL(&stats_mux);
+    d->bat[i].level = level;
+    portEXIT_CRITICAL(&stats_mux);
+    uint8_t low = bat_lowest(d);
+    if (low == ORBIT_BATTERY_UNKNOWN) {
+        return;
+    }
+    if (low <= BAT_LOW && !d->bat_low_told) {
+        d->bat_low_told = true;
+        int port = orbit_ledger_port(&d->addr);
+        portENTER_CRITICAL(&stats_mux);
+        bat_notice.port = port;
+        bat_notice.level = low;
+        bat_notice.at_us = esp_timer_get_time();
+        portEXIT_CRITICAL(&stats_mux);
+        EVT(d, "battery low %u%% (port %d)", low, port);
+    } else if (low >= BAT_LOW_CLEAR && d->bat_low_told) {
+        d->bat_low_told = false;
+    }
+}
+
+static void bat_advance(dev_t* d) {
+    if (d->bat_phase == BAT_CCCD) {
+        d->bat_cur++;
+        d->bat_phase = BAT_DSCS;
+    } else {
+        d->bat_phase++;
+    }
+    bat_next(d);
+}
+
+static int on_bat_svc(uint16_t conn_handle, const struct ble_gatt_error* error, const struct ble_gatt_svc* svc,
+                      void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0;
+    }
+    if (error->status == 0) {
+        if (d->bat_n_svcs < MAX_BAT) {
+            d->bat_svc_start[d->bat_n_svcs] = svc->start_handle;
+            d->bat_svc_end[d->bat_n_svcs] = svc->end_handle;
+            d->bat_n_svcs++;
+        }
+        return 0;
+    }
+    if (error->status != BLE_HS_EDONE && error->status != BLE_HS_ATT_ERR(BLE_ATT_ERR_ATTR_NOT_FOUND)) {
+        EVT(d, "battery: service discovery failed status=0x%x", error->status);
+    }
+    EVT(d, "battery: %d Battery Service(s)", d->bat_n_svcs);
+    d->bat_cur = 0;
+    d->bat_phase = BAT_CHRS;
+    bat_next(d);
+    return 0;
+}
+
+static int on_bat_chr(uint16_t conn_handle, const struct ble_gatt_error* error, const struct ble_gatt_chr* chr,
+                      void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0;
+    }
+    if (error->status == 0) {
+        // Descriptors of the previous characteristic end right before this one.
+        if (d->bat_n > 0 && d->bat[d->bat_n - 1].end_handle == d->bat_svc_end[d->bat_cur] &&
+            d->bat[d->bat_n - 1].val_handle < chr->def_handle) {
+            d->bat[d->bat_n - 1].end_handle = chr->def_handle - 1;
+        }
+        if (uuid16_of(d, &chr->uuid) == UUID_BATTERY_LEVEL && d->bat_n < MAX_BAT) {
+            memset(&d->bat[d->bat_n], 0, sizeof(d->bat[0]));
+            d->bat[d->bat_n].def_handle = chr->def_handle;
+            d->bat[d->bat_n].val_handle = chr->val_handle;
+            d->bat[d->bat_n].end_handle = d->bat_svc_end[d->bat_cur];
+            d->bat[d->bat_n].props = chr->properties;
+            d->bat[d->bat_n].level = ORBIT_BATTERY_UNKNOWN;
+            d->bat_n++;
+        }
+        return 0;
+    }
+    if (error->status != BLE_HS_EDONE) {
+        EVT(d, "battery: characteristic discovery failed status=0x%x", error->status);
+    }
+    d->bat_cur++;
+    bat_next(d); // still BAT_CHRS until the last service
+    return 0;
+}
+
+static int on_bat_dsc(uint16_t conn_handle, const struct ble_gatt_error* error, uint16_t chr_val_handle,
+                      const struct ble_gatt_dsc* dsc, void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0;
+    }
+    if (error->status == 0) {
+        uint16_t uuid16 = uuid16_of(d, &dsc->uuid);
+        if (uuid16 == UUID_CCCD) {
+            d->bat[d->bat_cur].cccd_handle = dsc->handle;
+        } else if (uuid16 == UUID_USER_DESC) {
+            d->bat[d->bat_cur].user_desc_handle = dsc->handle;
+        } else if (uuid16 == UUID_PRESENTATION) {
+            d->bat[d->bat_cur].presentation_handle = dsc->handle;
+        }
+        return 0;
+    }
+    if (error->status != BLE_HS_EDONE) {
+        EVT(d, "battery %d: descriptor discovery failed status=0x%x", d->bat_cur, error->status);
+    }
+    bat_chr_t* b = &d->bat[d->bat_cur];
+    EVT(d, "battery %d: handle=%u props=0x%02x read=%d notify=%d cccd=%d user_desc=%d presentation=%d", d->bat_cur,
+        b->val_handle, b->props, !!(b->props & BLE_GATT_CHR_PROP_READ), !!(b->props & BLE_GATT_CHR_PROP_NOTIFY),
+        b->cccd_handle != 0, b->user_desc_handle != 0, b->presentation_handle != 0);
+    bat_advance(d);
+    return 0;
+}
+
+static int on_bat_read(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
+                       void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0;
+    }
+    if (error->status != 0 || attr == NULL || attr->om == NULL) {
+        EVT(d, "battery %d: read failed status=0x%x", d->bat_cur, error->status);
+        bat_advance(d);
+        return 0;
+    }
+    uint8_t v[32];
+    int len = OS_MBUF_PKTLEN(attr->om);
+    if (len > (int) sizeof(v)) {
+        len = sizeof(v);
+    }
+    os_mbuf_copydata(attr->om, 0, len, v);
+    if (d->bat_phase == BAT_LEVEL) {
+        EVT(d, "battery %d: level=%u%% (%d byte(s))", d->bat_cur, len > 0 ? v[0] : 0, len);
+        bat_set_level(d, d->bat_cur, v, len);
+    } else if (d->bat_phase == BAT_USER_DESC) {
+        char text[32];
+        copy_printable(text, sizeof(text), v, len);
+        EVT(d, "battery %d: user description=\"%s\"", d->bat_cur, text);
+    } else if (len >= 7) { // format(1) exponent(1) unit(2) namespace(1) description(2)
+        EVT(d, "battery %d: presentation format=0x%02x unit=0x%04x namespace=0x%02x description=0x%04x", d->bat_cur,
+            v[0], (unsigned) (v[2] | v[3] << 8), v[4], (unsigned) (v[5] | v[6] << 8));
+    } else {
+        EVT(d, "battery %d: presentation format %d byte(s)", d->bat_cur, len);
+    }
+    bat_advance(d);
+    return 0;
+}
+
+static int on_bat_cccd(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
+                       void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0;
+    }
+    if (error->status == 0) {
+        d->bat[d->bat_cur].notifying = true;
+        EVT(d, "battery %d: notifications on", d->bat_cur);
+    } else {
+        EVT(d, "battery %d: cccd write failed status=0x%x", d->bat_cur, error->status);
+    }
+    bat_advance(d);
+    return 0;
+}
+
+// Starts the procedure of the current phase, or moves on when it has none.
+static void bat_next(dev_t* d) {
+    static const uint8_t notify_on[2] = {1, 0};
+    for (;;) {
+        int rc = 0;
+        if (d->bat_phase == BAT_CHRS) {
+            if (d->bat_cur >= d->bat_n_svcs) {
+                EVT(d, "battery: %d Battery Level characteristic(s)", d->bat_n);
+                d->bat_cur = 0;
+                d->bat_phase = BAT_DSCS;
+                continue;
+            }
+            rc = ble_gattc_disc_all_chrs(d->conn_handle, d->bat_svc_start[d->bat_cur], d->bat_svc_end[d->bat_cur],
+                                         on_bat_chr, d->ctx);
+        } else if (d->bat_phase >= BAT_DSCS && d->bat_phase <= BAT_CCCD && d->bat_cur >= d->bat_n) {
+            d->bat_phase = BAT_DONE;
+            bool reread = false, notify = false;
+            for (int i = 0; i < d->bat_n; i++) {
+                reread |= bat_pollable(&d->bat[i]);
+                notify |= d->bat[i].notifying;
+            }
+            d->bat_read_us = reread ? esp_timer_get_time() : 0;
+            uint8_t low = bat_lowest(d);
+            char low_text[8] = "?";
+            if (low != ORBIT_BATTERY_UNKNOWN) {
+                snprintf(low_text, sizeof(low_text), "%u%%", low);
+            }
+            EVT(d, "battery: probe done lowest=%s updates=%s", low_text,
+                reread && notify ? "notify+reread" : reread ? "reread" : notify ? "notify" : "none");
+            return;
+        } else {
+            bat_chr_t* b = &d->bat[d->bat_cur];
+            switch (d->bat_phase) {
+            case BAT_DSCS:
+                if (b->end_handle <= b->val_handle) {
+                    EVT(d, "battery %d: handle=%u read=%d notify=%d, no descriptors", d->bat_cur, b->val_handle,
+                        !!(b->props & BLE_GATT_CHR_PROP_READ), !!(b->props & BLE_GATT_CHR_PROP_NOTIFY));
+                    d->bat_phase++;
+                    continue;
+                }
+                rc = ble_gattc_disc_all_dscs(d->conn_handle, b->val_handle, b->end_handle, on_bat_dsc, d->ctx);
+                break;
+            case BAT_LEVEL:
+                if (!(b->props & BLE_GATT_CHR_PROP_READ)) {
+                    d->bat_phase++;
+                    continue;
+                }
+                rc = ble_gattc_read(d->conn_handle, b->val_handle, on_bat_read, d->ctx);
+                break;
+            case BAT_USER_DESC:
+                if (b->user_desc_handle == 0) {
+                    d->bat_phase++;
+                    continue;
+                }
+                rc = ble_gattc_read(d->conn_handle, b->user_desc_handle, on_bat_read, d->ctx);
+                break;
+            case BAT_PRESENTATION:
+                if (b->presentation_handle == 0) {
+                    d->bat_phase++;
+                    continue;
+                }
+                rc = ble_gattc_read(d->conn_handle, b->presentation_handle, on_bat_read, d->ctx);
+                break;
+            case BAT_CCCD:
+                if (!(b->props & BLE_GATT_CHR_PROP_NOTIFY) || b->cccd_handle == 0) {
+                    d->bat_cur++;
+                    d->bat_phase = BAT_DSCS;
+                    continue;
+                }
+                rc = ble_gattc_write_flat(d->conn_handle, b->cccd_handle, notify_on, sizeof(notify_on), on_bat_cccd,
+                                          d->ctx);
+                break;
+            default:
+                return;
+            }
+        }
+        if (rc == 0) {
+            return;
+        }
+        EVT(d, "battery: phase %d start failed rc=0x%x, probe stopped", d->bat_phase, rc);
+        d->bat_phase = BAT_DONE;
+        return;
+    }
+}
+
+static int on_bat_reread(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
+                         void* arg);
+
+// Reads the next level without notifications, from bat_cur on.
+static void bat_reread_next(dev_t* d) {
+    for (; d->bat_cur < d->bat_n; d->bat_cur++) {
+        if (!bat_pollable(&d->bat[d->bat_cur])) {
+            continue;
+        }
+        int rc = ble_gattc_read(d->conn_handle, d->bat[d->bat_cur].val_handle, on_bat_reread, d->ctx);
+        if (rc == 0) {
+            return;
+        }
+        EVT(d, "battery %d: reread start failed rc=0x%x", d->bat_cur, rc);
+    }
+    d->bat_phase = BAT_DONE;
+    d->bat_read_us = esp_timer_get_time();
+}
+
+static int on_bat_reread(uint16_t conn_handle, const struct ble_gatt_error* error, struct ble_gatt_attr* attr,
+                         void* arg) {
+    dev_t* d = gatt_ctx_dev(arg, conn_handle);
+    if (d == NULL) {
+        return 0;
+    }
+    if (error->status == 0 && attr != NULL && attr->om != NULL) {
+        uint8_t v[1] = {0};
+        int len = OS_MBUF_PKTLEN(attr->om);
+        os_mbuf_copydata(attr->om, 0, len > 0 ? 1 : 0, v);
+        EVT(d, "battery %d: reread level=%u%% (%d byte(s)) after %.1f s", d->bat_cur, v[0], len,
+            (esp_timer_get_time() - d->connected_us) / 1e6);
+        bat_set_level(d, d->bat_cur, v, len);
+    } else {
+        EVT(d, "battery %d: reread failed status=0x%x", d->bat_cur, error->status);
+    }
+    d->bat_cur++;
+    bat_reread_next(d);
+    return 0;
+}
+
+// From periodic_check(): reads the levels again when they are due and the
+// device's input has paused, so that the read never sits between reports.
+static void bat_reread_if_due(dev_t* d, int64_t now) {
+    if (!d->connected || d->bat_phase != BAT_DONE || d->bat_read_us == 0 || now - d->bat_read_us < BAT_REREAD_US ||
+        now - d->last_report_us < BAT_QUIET_US) {
+        return;
+    }
+    d->bat_phase = BAT_REREAD;
+    d->bat_cur = 0;
+    bat_reread_next(d);
+}
+
+static void bat_start(dev_t* d) {
+    if (d->bat_started) {
+        return;
+    }
+    d->bat_started = true;
+    d->bat_phase = BAT_SVCS;
+    int rc = ble_gattc_disc_svc_by_uuid(d->conn_handle, BLE_UUID16_DECLARE(UUID_BATTERY_SERVICE), on_bat_svc, d->ctx);
+    if (rc != 0) {
+        EVT(d, "battery: service discovery start failed rc=0x%x", rc);
+        d->bat_phase = BAT_DONE;
+    }
+}
+
 // ---- GAP events ----
 
 static void on_notify(dev_t* d, uint16_t attr_handle, struct os_mbuf* om) {
     int64_t now = esp_timer_get_time();
+    for (int i = 0; i < d->bat_n; i++) {
+        if (d->bat[i].val_handle == attr_handle) {
+            uint8_t level = 0;
+            int len = OS_MBUF_PKTLEN(om);
+            os_mbuf_copydata(om, 0, len > 0 ? 1 : 0, &level);
+            EVT(d, "battery %d notify level=%u%% (%d byte(s)) after %.1f s", i, level, len,
+                (now - d->connected_us) / 1e6);
+            bat_set_level(d, i, &level, len);
+            return; // not an input report
+        }
+    }
     portENTER_CRITICAL(&stats_mux);
     if (d->last_report_us != 0) {
         int64_t gap = now - d->last_report_us;
@@ -2114,6 +2545,10 @@ void orbit_ble_move(int new_port, int old_port) {
     post_command((cmd_t) { .kind = CMD_MOVE, .a = new_port, .b = old_port });
 }
 
+void orbit_ble_battery_test(int port, int level) {
+    post_command((cmd_t) { .kind = CMD_BATTERY_TEST, .a = port, .b = level });
+}
+
 void orbit_ble_approve(void) {
     ble_npl_eventq_put(nimble_port_get_dflt_eventq(), &approve_ev);
 }
@@ -2136,6 +2571,38 @@ void orbit_ble_approval(orbit_approval_t* out) {
 
 int orbit_ble_slot_port(int slot) {
     return devs[slot].connected ? orbit_ledger_port(&devs[slot].addr) : 0;
+}
+
+uint8_t orbit_ble_slot_battery(int slot) {
+    portENTER_CRITICAL(&stats_mux);
+    uint8_t level = devs[slot].connected ? bat_lowest(&devs[slot]) : ORBIT_BATTERY_UNKNOWN;
+    portEXIT_CRITICAL(&stats_mux);
+    return level;
+}
+
+uint8_t orbit_ble_port_battery(int port) {
+    for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+        if (port != 0 && orbit_ble_slot_port(i) == port) {
+            return orbit_ble_slot_battery(i);
+        }
+    }
+    return ORBIT_BATTERY_UNKNOWN;
+}
+
+bool orbit_ble_battery_notice(int* port, int* level) {
+    int64_t now = esp_timer_get_time();
+    portENTER_CRITICAL(&stats_mux);
+    bool on = bat_notice.at_us != 0 && now - bat_notice.at_us < BAT_NOTICE_US;
+    *port = bat_notice.port;
+    *level = bat_notice.level;
+    portEXIT_CRITICAL(&stats_mux);
+    // Gone with the device: a disconnected device shows no level, so its
+    // notice would talk about nothing on the screen (bat1-36eb937 report).
+    bool connected = false;
+    for (int i = 0; on && i < ORBIT_MAX_DEVS; i++) {
+        connected |= *port != 0 && orbit_ble_slot_port(i) == *port;
+    }
+    return on && connected;
 }
 
 bool orbit_ble_duplicates(void) {
@@ -2171,6 +2638,7 @@ void orbit_ble_take_stats(int i, orbit_dev_stats_t* out) {
     memcpy(out->gaps, d->gaps, sizeof(out->gaps));
     out->total_reports = d->total_reports;
     out->disconnects = d->disconnects;
+    out->battery = d->connected ? bat_lowest(d) : ORBIT_BATTERY_UNKNOWN;
     d->reports = 0;
     d->max_gap_us = 0;
     memset(d->gaps, 0, sizeof(d->gaps));

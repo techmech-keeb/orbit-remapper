@@ -24,12 +24,19 @@ void orbit_commands_log_ledger() {
     for (int i = 0; orbit_ledger_nth(i, &row); i++, n++) {
         char name[64];
         orbit_ledger_display_name(&row, name, sizeof(name));
+        // Lowest Battery Level in % while connected; "-" when not connected,
+        // without a Battery Service, or not read yet.
+        char battery[8] = "-";
+        uint8_t level = orbit_ble_port_battery(row.port);
+        if (level != ORBIT_BATTERY_UNKNOWN) {
+            snprintf(battery, sizeof(battery), "%u", level);
+        }
         olog("M1 LDG t=%.3f port=%d addr=..:%02x:%02x key=%s kind=%s vid=%04x pid=%04x hash=%08x last=%lu "
-             "name=\"%s\" manufacturer=\"%s\" model=\"%s\" alias=\"%s\" shown=\"%s\"\n",
+             "battery=%s name=\"%s\" manufacturer=\"%s\" model=\"%s\" alias=\"%s\" shown=\"%s\"\n",
              orbit_now_s(), row.port, row.addr.val[1], row.addr.val[0],
              (row.flags & ORBIT_LEDGER_NO_KEY) ? "none" : "yes", orbit_ledger_kind_name(row.kind), row.vid, row.pid,
-             (unsigned) row.map_hash, (unsigned long) row.last_used, row.name, row.manufacturer, row.model, row.alias,
-             name);
+             (unsigned) row.map_hash, (unsigned long) row.last_used, battery, row.name, row.manufacturer, row.model,
+             row.alias, name);
     }
     olog("M1 LDG t=%.3f %d of %d ports used\n", orbit_now_s(), n, ORBIT_LEDGER_MAX);
 }
@@ -42,7 +49,7 @@ static void run(char* cmd) {
     verb = strtok(NULL, " ");
     if (verb == NULL || strcmp(verb, "help") == 0) {
         olog("M1 CMD commands: orbit list | forget <port> | move <new port> <old port> | alias <port> <text> | "
-             "pair | stop | approve\n");
+             "pair | stop | approve | battery <port> <percent>\n");
         return;
     }
     if (strcmp(verb, "list") == 0) {
@@ -71,6 +78,14 @@ static void run(char* cmd) {
     } else if (strcmp(verb, "stop") == 0) {
         olog("M1 CMD stop pairing\n");
         orbit_ble_stop_pairing();
+    } else if (strcmp(verb, "battery") == 0) {
+        // Test aid: shows a level as if the device had reported it.
+        const char* a = strtok(NULL, " ");
+        const char* b = strtok(NULL, " ");
+        int port = a != NULL ? atoi(a) : 0;
+        int level = b != NULL ? atoi(b) : -1;
+        olog("M1 CMD battery test port %d level %d\n", port, level);
+        orbit_ble_battery_test(port, level);
     } else if (strcmp(verb, "approve") == 0) {
         olog("M1 CMD approve\n");
         orbit_ble_approve();
