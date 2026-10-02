@@ -116,10 +116,10 @@ void orbit_request_download_mode(const char* why) {
 }
 
 static void print_start() {
-    olog("M1 START idf=%s app=%s upstream=%s config_size=%d descriptor=%u vid=%04x pid=%04x "
-         "max_devs=%d conn_itvl=6(7.50ms) lvgl_reserve=%s\n",
-         esp_get_idf_version(), esp_app_get_description()->version, ORBIT_UPSTREAM_COMMIT,
-         PERSISTED_CONFIG_SIZE, our_descriptor_number, 0xCAFE, 0xBAF2, ORBIT_MAX_DEVS,
+    olog("M1 START idf=%s app=%s version=%s upstream=%s config_size=%d descriptor=%u vid=%04x pid=%04x "
+         "bcd=%04x max_devs=%d conn_itvl=6(7.50ms) lvgl_reserve=%s\n",
+         esp_get_idf_version(), esp_app_get_description()->version, ORBIT_VERSION, ORBIT_UPSTREAM_COMMIT,
+         PERSISTED_CONFIG_SIZE, our_descriptor_number, 0xCAFE, 0xBAF2, ORBIT_VERSION_BCD, ORBIT_MAX_DEVS,
          ui_ready ? "lvgl" : "text");
 }
 
