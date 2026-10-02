@@ -20,28 +20,21 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 
 これからの予定（機器ごとのレイヤー、切断時の押しっぱなしの解除、設定セット、LED の送り返し）は [M2 の依頼書](dev/drafts/2026-09-30/m2-brief.md) にあります。
 
-## 使い方と作り方
+## 使い方
 
-- ファームウェアのビルド、書き込み、ログの読み方：[firmware/orbit/README.md](firmware/orbit/README.md)
-- 取り込んだ本家のコードと版：[firmware/hid-remapper/UPSTREAM.md](firmware/hid-remapper/UPSTREAM.md)
+- [はじめに](docs/getting-started.md)：用意するもの、書き込み、最初のペアリング
+- [ふだんの使い方](docs/using.md)：画面の見方、ダイヤルの操作、機器の追加と削除
+- [リマップの設定](docs/configuration.md)：本家の Web 設定ツールでの設定、機器ごとに分ける方法
+- [困ったとき](docs/troubleshooting.md)
 
-## 資料
+**ビルド済みのファームウェアは、今は配布していません。** ESP-IDF v5.5.5 で自分でビルドします（[firmware/orbit/README.md](firmware/orbit/README.md#2-ビルドと書き込み)）。BIOS の画面で使えるか、PC をスリープから起こせるかは、まだ確かめていません。
 
-開発の記録は `dev/drafts/` にあります。日付ごとのフォルダで、確定版ではありません。
+## 開発に加わる人へ
 
-- [要件と決定](dev/drafts/2026-09-26/requirements.md)
-- [実装の設計](dev/drafts/2026-09-27/implementation-design.md)
-- [M1 の結果](dev/drafts/2026-09-27/m1-results.md)、[M2 の結果](dev/drafts/2026-09-30/m2-results.md)
-- [画面（M3）](dev/drafts/2026-10-01/m3-screen.md)
-- [未解決事項](dev/drafts/2026-09-26/open-questions.md)
-- [設計の経緯](dev/drafts/2026-09-26/history.md)
-- 実機の試験の報告：`dev/drafts/2026-09-27/reports/`
-
-当初の筐体案（E1）の CAD と検査記録は `dev/artifacts/drafts/` に経緯として残しています。今の構成ではありません。
+ファームウェアの構成、開発の記録、実機の試験の流れは [dev/README.md](dev/README.md) にあります。
 
 ## 注意
 
-- **PR の番号**：資料に出てくる「PR #16」などの番号は、2026-10-02 に公開するまで使っていた非公開の開発リポジトリのものです。このリポジトリの PR とは対応しません。そのころの変更は、`main` の履歴のマージコミット（「Merge pull request #16 …」）でたどれます。
 - **USB の VID/PID と製品名**：今は本家の Web 設定ツールをそのまま使うため、本家と同じ `0xCAFE` / `0xBAF2` と「HID Remapper Bluetooth」という製品名を名乗ります。正式な割り当てではありません（[Q35](dev/drafts/2026-09-26/open-questions.md)）。
 - **名前**：「Orbit」はリポジトリ名として使っているだけで、商標の確認はしていません。
 - **ログ**：ファームウェアのログには、機器のアドレスの下位 2 バイトだけを出します。ペアリングの鍵や M5Dial の MAC アドレスは出しません。
@@ -52,7 +45,7 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 | --- | --- |
 | ソフトウェア（ファームウェア、ツール、CAD・描画の生成スクリプト） | [MIT License](LICENSE) |
 | ハードウェア設計（STEP、DXF、今後の基板データ） | [CERN Open Hardware Licence Version 2 - Permissive](LICENSE-HARDWARE)（CERN-OHL-P-2.0） |
-| 文書と画像（`docs/` と各 README、`docs/images/` の写真） | [Creative Commons Attribution 4.0 International](LICENSE-DOCS)（CC BY 4.0） |
+| 文書と画像（`docs/`、`dev/` の文書と各 README、`docs/images/` の写真） | [Creative Commons Attribution 4.0 International](LICENSE-DOCS)（CC BY 4.0） |
 | 本家 HID Remapper のコード（`firmware/hid-remapper/`） | 本家の [MIT License](firmware/hid-remapper/LICENSE)（Copyright (c) 2023 Jacek Fedorynski）。一部のファイルは各自の表示に従う |
 | ビルド時に取得する部品（ESP-IDF、NimBLE、TinyUSB、LVGL など） | 各部品のライセンス。このリポジトリには含めない |
 | 第三者の素材（メーカーの写真、寸法図、フォント） | このリポジトリには含めない。出典のリンクだけを残す |
