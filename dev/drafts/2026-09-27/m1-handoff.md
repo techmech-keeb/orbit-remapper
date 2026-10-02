@@ -19,7 +19,7 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
   - B6：MD600 側で Orbit のペアリングを消す（アドレスが変わらない手順があれば）→ MD600 の電源を入れ直す → `approval wanted: device has no key for us; press the button within 60 s` → 画面を短く押す → `approved: port 3 ... may pair again` → MD600 が新しい鍵でつながり `new key accepted (approved by the user)`。もう一度同じことをして、今度は押さずに 60 秒待つ → `approval for port 3 not given within 60 s (1 of 3)`。
 - **見てほしいこと**：台帳の保存（`ledger save failed` が出ないこと）、`heap_min`（台帳で約 4 KB 増える見込み）、命令を打っている間に `LAT` が増えないか。
 - 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
-- 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `docs/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
+- 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `dev/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ### MD600・meteorite40 の回帰確認（行う場合）
 
@@ -186,7 +186,7 @@ A1 の報告（利用者が 2026-09-27 に書いたもの）の形がよい：�
 - **ボタン＋RST で書き込みモードに入るのは、USB を使い始める前に判定する**ので、アプリの USB の不具合に左右されにくい。3 つの戻り方の中で最も確実。ただし `db94be3` のように再起動の前に USB シリアルをいじると壊れる。
 - **ESP32-S3 の USB は送信用の FIFO が 5 本（IN endpoint 0〜4）**。IN endpoint は 0x84 までしか使えない。HID 2 つと CDC（通知＋データ）でちょうど 4 本を使い切っている。これ以上 IN endpoint を足せない。
 - 静的に使う RAM が約 105 KB ある（`idf.py size` の DIRAM）。A9 のときに内訳を調べる。
-- Q31 の試験プログラム（`experiments/q31-s3-two-ble/`）はそのまま残してある。
+- Q31 の試験プログラム（`dev/experiments/q31-s3-two-ble/`）はそのまま残してある。
 
 ## 9. 守ること
 

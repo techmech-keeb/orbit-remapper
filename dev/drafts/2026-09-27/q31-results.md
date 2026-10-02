@@ -6,7 +6,7 @@ finalized: false
 
 # Q31 実験の結果：M5Dial で BLE 機器 2 台を 7.5 ms で受けられるか
 
-仕様は [q31-experiment-brief.md](../2026-09-26/q31-experiment-brief.md)、試験プログラムは [experiments/q31-s3-two-ble/](../../../experiments/q31-s3-two-ble/README.md)。この文書は、2026-09-27 に利用者の PC のセッションで M5Dial のシリアルログを取りながら行った試験の記録。
+仕様は [q31-experiment-brief.md](../2026-09-26/q31-experiment-brief.md)、試験プログラムは [dev/experiments/q31-s3-two-ble/](../../experiments/q31-s3-two-ble/README.md)。この文書は、2026-09-27 に利用者の PC のセッションで M5Dial のシリアルログを取りながら行った試験の記録。
 
 ## 1. 結論
 

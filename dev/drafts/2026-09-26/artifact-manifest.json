@@ -4,7 +4,7 @@
  "originals_unchanged": true,
  "files": [
   {
-   "path": "artifacts/drafts/2026-09-26/originals/remapper_3d_viewer.html",
+   "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_3d_viewer.html",
    "source_name": "remapper_3d_viewer.html",
    "kind": "original",
    "bytes": 3894002,
@@ -13,7 +13,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/originals/remapper_bom_v0.3.xlsx",
+   "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_bom_v0.3.xlsx",
    "source_name": "remapper_bom_v0.3.xlsx",
    "kind": "original",
    "bytes": 14194,
@@ -21,7 +21,7 @@
    "location": "private-archive"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.docx",
+   "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.docx",
    "source_name": "remapper_claude_handoff.docx",
    "kind": "original",
    "bytes": 2170702,
@@ -29,7 +29,7 @@
    "location": "private-archive"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.md",
+   "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_claude_handoff.md",
    "source_name": "remapper_claude_handoff.md",
    "kind": "original",
    "bytes": 33251,
@@ -41,16 +41,16 @@
    "kind": "original",
    "bytes": 12682545,
    "sha256": "31b5897262b02171aeddb082dc264954cf1b9919503850c92f94a1f87ef0fa40",
-   "reconstruct_as": "artifacts/drafts/2026-09-26/originals/remapper_design.zip",
+   "reconstruct_as": "dev/artifacts/drafts/2026-09-26/originals/remapper_design.zip",
    "storage": "split",
    "parts": [
     {
-     "path": "artifacts/drafts/2026-09-26/originals/remapper_design.zip.part01",
+     "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_design.zip.part01",
      "bytes": 8388608,
      "sha256": "feac992d325c9b430c48cdb8f4ffd103e56702b75c9e6700c7808b2522419e54"
     },
     {
-     "path": "artifacts/drafts/2026-09-26/originals/remapper_design.zip.part02",
+     "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_design.zip.part02",
      "bytes": 4293937,
      "sha256": "d5b587292c659fb0b7cbb8ce48deb79f30de5d5643d4af32c9a9cea51bcf5683"
     }
@@ -59,7 +59,7 @@
    "location_note": "展開済みファイルと重複するため保存しない。分割部品は PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/originals/remapper_design_review.pdf",
+   "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_design_review.pdf",
    "source_name": "remapper_design_review.pdf",
    "kind": "original",
    "bytes": 1088152,
@@ -67,7 +67,7 @@
    "location": "private-archive"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/originals/remapper_preview.png",
+   "path": "dev/artifacts/drafts/2026-09-26/originals/remapper_preview.png",
    "source_name": "remapper_preview.png",
    "kind": "original",
    "bytes": 117257,
@@ -76,7 +76,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/README.md",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/README.md",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/README.md",
    "kind": "extracted-original",
@@ -85,7 +85,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/build_report.py",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/build_report.py",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/build_report.py",
    "kind": "extracted-original",
@@ -94,7 +94,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/build_viewer.py",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/build_viewer.py",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/build_viewer.py",
    "kind": "extracted-original",
@@ -103,7 +103,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/01_upper_shell.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/01_upper_shell.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/01_upper_shell.step",
    "kind": "extracted-original",
@@ -112,7 +112,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/02_bottom.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/02_bottom.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/02_bottom.step",
    "kind": "extracted-original",
@@ -121,7 +121,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/03_display_carrier.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/03_display_carrier.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/03_display_carrier.step",
    "kind": "extracted-original",
@@ -130,7 +130,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/04_knob.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/04_knob.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/04_knob.step",
    "kind": "extracted-original",
@@ -139,7 +139,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/05_back_button.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/05_back_button.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/05_back_button.step",
    "kind": "extracted-original",
@@ -148,7 +148,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/06_reset_button.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/06_reset_button.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/06_reset_button.step",
    "kind": "extracted-original",
@@ -157,7 +157,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_mechanical_envelope.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_mechanical_envelope.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/PCB_mechanical_envelope.step",
    "kind": "extracted-original",
@@ -166,7 +166,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_outline_NPTH.dxf",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_outline_NPTH.dxf",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/PCB_outline_NPTH.dxf",
    "kind": "extracted-original",
@@ -175,7 +175,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/assembly_review.step",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/assembly_review.step",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/assembly_review.step",
    "kind": "extracted-original",
@@ -184,7 +184,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/build_model.py",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/build_model.py",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/build_model.py",
    "kind": "extracted-original",
@@ -193,7 +193,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/mesh_cleanup.py",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/mesh_cleanup.py",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/mesh_cleanup.py",
    "kind": "extracted-original",
@@ -202,7 +202,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/parameters.json",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/parameters.json",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/parameters.json",
    "kind": "extracted-original",
@@ -211,7 +211,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/cad/verify_mesh.py",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/cad/verify_mesh.py",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/cad/verify_mesh.py",
    "kind": "extracted-original",
@@ -220,7 +220,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/component_positions.csv",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/component_positions.csv",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/component_positions.csv",
    "kind": "extracted-original",
@@ -229,7 +229,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/display_mount.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/display_mount.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/display_mount.png",
    "kind": "extracted-original",
@@ -239,7 +239,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/exploded.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/exploded.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/exploded.png",
    "kind": "extracted-original",
@@ -249,7 +249,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/front.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/front.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/front.png",
    "kind": "extracted-original",
@@ -259,7 +259,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/inside.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/inside.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/inside.png",
    "kind": "extracted-original",
@@ -269,7 +269,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/mesh.json",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/mesh.json",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/mesh.json",
    "kind": "extracted-original",
@@ -279,7 +279,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/pcb_layout.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/pcb_layout.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/pcb_layout.png",
    "kind": "extracted-original",
@@ -289,7 +289,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/perspective.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/perspective.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/perspective.png",
    "kind": "extracted-original",
@@ -299,7 +299,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/rear.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/rear.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/rear.png",
    "kind": "extracted-original",
@@ -309,7 +309,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/render_views.py",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/render_views.py",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/render_views.py",
    "kind": "extracted-original",
@@ -318,7 +318,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/drawings/side.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/drawings/side.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/drawings/side.png",
    "kind": "extracted-original",
@@ -328,7 +328,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/fit_checks.json",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/fit_checks.json",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/fit_checks.json",
    "kind": "extracted-original",
@@ -337,7 +337,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/fonts/IPA_Font_License_Agreement_v1.0.txt",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/fonts/IPA_Font_License_Agreement_v1.0.txt",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/fonts/IPA_Font_License_Agreement_v1.0.txt",
    "kind": "extracted-original",
@@ -347,7 +347,7 @@
    "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/fonts/ipaexg.ttf",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/fonts/ipaexg.ttf",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/fonts/ipaexg.ttf",
    "kind": "extracted-original",
@@ -357,7 +357,7 @@
    "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/mesh_checks.json",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/mesh_checks.json",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/mesh_checks.json",
    "kind": "extracted-original",
@@ -366,7 +366,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/01_upper_shell.stl",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/01_upper_shell.stl",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/print_candidate/01_upper_shell.stl",
    "kind": "extracted-original",
@@ -376,7 +376,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/02_bottom.stl",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/02_bottom.stl",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/print_candidate/02_bottom.stl",
    "kind": "extracted-original",
@@ -386,7 +386,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/03_display_carrier.stl",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/03_display_carrier.stl",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/print_candidate/03_display_carrier.stl",
    "kind": "extracted-original",
@@ -396,7 +396,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/04_knob.stl",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/04_knob.stl",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/print_candidate/04_knob.stl",
    "kind": "extracted-original",
@@ -406,7 +406,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/05_back_button.stl",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/05_back_button.stl",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/print_candidate/05_back_button.stl",
    "kind": "extracted-original",
@@ -416,7 +416,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/06_reset_button.stl",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/print_candidate/06_reset_button.stl",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/print_candidate/06_reset_button.stl",
    "kind": "extracted-original",
@@ -426,7 +426,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/detail.webp",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/references/detail.webp",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/references/detail.webp",
    "kind": "extracted-original",
@@ -436,7 +436,7 @@
    "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/dimensions.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/references/dimensions.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/references/dimensions.png",
    "kind": "extracted-original",
@@ -446,7 +446,7 @@
    "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/front.webp",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/references/front.webp",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/references/front.webp",
    "kind": "extracted-original",
@@ -456,7 +456,7 @@
    "location_note": "第三者の素材。出典から取得する（e1-v0.3/references/README.md）。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/references/selected_E1_concept.png",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/references/selected_E1_concept.png",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/references/selected_E1_concept.png",
    "kind": "extracted-original",
@@ -465,7 +465,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/remapper_3d_viewer.html",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/remapper_3d_viewer.html",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/remapper_3d_viewer.html",
    "kind": "extracted-original",
@@ -475,7 +475,7 @@
    "location_note": "生成物。Release に添付するまで PR #1 のブランチにのみ残る。"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/remapper_design_review.pdf",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/remapper_design_review.pdf",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/remapper_design_review.pdf",
    "kind": "extracted-original",
@@ -484,7 +484,7 @@
    "location": "private-archive"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/stl_cleanup.json",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/stl_cleanup.json",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/stl_cleanup.json",
    "kind": "extracted-original",
@@ -493,7 +493,7 @@
    "location": "orbit-remapper"
   },
   {
-   "path": "artifacts/drafts/2026-09-26/e1-v0.3/viewer_checks.json",
+   "path": "dev/artifacts/drafts/2026-09-26/e1-v0.3/viewer_checks.json",
    "source_name": "remapper_design.zip",
    "archive_member": "remapper_design/viewer_checks.json",
    "kind": "extracted-original",
@@ -505,14 +505,14 @@
  "bom_reference_exports": [
   {
    "sheet": "BOM",
-   "path": "artifacts/drafts/2026-09-26/bom-reference/sheet-01.csv",
+   "path": "dev/artifacts/drafts/2026-09-26/bom-reference/sheet-01.csv",
    "bytes": 4922,
    "sha256": "a2755944e018919e6962f278ef6e271e52735ef719f48d81992d35b8e4d9024c",
    "location": "private-archive"
   },
   {
    "sheet": "変更履歴",
-   "path": "artifacts/drafts/2026-09-26/bom-reference/sheet-02.csv",
+   "path": "dev/artifacts/drafts/2026-09-26/bom-reference/sheet-02.csv",
    "bytes": 1015,
    "sha256": "10e003e73680a8bcb5ee9d167924f7ccbb21b471fc0ea7d93e8f95fd14718451",
    "location": "private-archive"

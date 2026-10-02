@@ -1,6 +1,6 @@
 // Q31 experiment: can the original M5Dial (ESP32-S3) keep a BLE keyboard and
 // a BLE mouse both at a 7.5 ms connection interval?
-// See docs/drafts/2026-09-26/q31-experiment-brief.md.
+// See dev/drafts/2026-09-26/q31-experiment-brief.md.
 
 #include <stdarg.h>
 #include <stdio.h>

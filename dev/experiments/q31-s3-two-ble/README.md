@@ -1,6 +1,6 @@
 # Q31 試験プログラム：M5Dial で BLE 機器 2 台を 7.5 ms で受けられるか
 
-初代 M5Dial（ESP32-S3）が、BLE のキーボードとマウスの 2 台を、どちらも接続間隔 7.5 ms で受けられるかを測るための試験プログラム。仕様は [q31-experiment-brief.md](../../docs/drafts/2026-09-26/q31-experiment-brief.md) による。
+初代 M5Dial（ESP32-S3）が、BLE のキーボードとマウスの 2 台を、どちらも接続間隔 7.5 ms で受けられるかを測るための試験プログラム。仕様は [q31-experiment-brief.md](../../drafts/2026-09-26/q31-experiment-brief.md) による。
 
 **測定は途中。** ビルドは下記の設定すべてで警告なしに通る（ESP-IDF v5.5.5）。実機（初代 M5Dial）では 2 台と 7.5 ms でつながり、報告が届くところまで確かめた。ただし Mistel MD600 Alpha が約 30 秒ごとに切れる問題を調べている（下の「30 秒ごとの切断を調べる版」）。
 
@@ -162,7 +162,7 @@ Q31 PKT t=4.600 h=1 NO ANSWER from us to the device's MTU_REQ for 1.0s
 
 ## ライセンスと出典
 
-- このディレクトリのコードは MIT（リポジトリの [LICENSE](../../LICENSE)）。
+- このディレクトリのコードは MIT（リポジトリの [LICENSE](../../../LICENSE)）。
 - ビルドに使う物（リポジトリには入れない）：ESP-IDF と NimBLE（Apache-2.0）、ビルド時に取り込む `espressif/esp_lcd_gc9a01` と `espressif/cmake_utilities`（Apache-2.0。版と検査値は `dependencies.lock`）。
 - 画面・ボタン・電源保持の端子番号は、M5Stack の公式ライブラリ（M5GFX の `src/M5GFX.cpp`、M5Unified の `src/M5Unified.inl`、どちらも MIT。2026-09-26 確認）の M5Dial の設定から読み取った。コードは写していない。
 - ESP-IDF の見本（blecent など）のコードは写していない。

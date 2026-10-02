@@ -20,7 +20,7 @@ finalized: false
 
 1. [implementation-design.md](implementation-design.md) §2（本家の構造）、§3（層）、§5（決定 1・2・3・6）
 2. [q31-results.md](q31-results.md) §3・§5・§7（GATT サーバーが必要、接続時に 7.5 ms を指定、書き込みでペアリング情報が消える）
-3. `experiments/q31-s3-two-ble/`（README と `main/ble_central.c`。BLE 受信の種）
+3. `dev/experiments/q31-s3-two-ble/`（README と `main/ble_central.c`。BLE 受信の種）
 4. [prior-art.md](../2026-09-26/prior-art.md) の `esp_hidh` の不具合の表（使わない理由）
 5. 本家のソース `jfedor2/hid-remapper` コミット `51ab8b3`：`firmware/src/platform.h`、`firmware-bluetooth/src/main.cc`（主ループの手本）、`firmware/src/tinyusb_stuff.cc` と `firmware/src/main.cc`（USB の手本）
 
