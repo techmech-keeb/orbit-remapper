@@ -11,6 +11,7 @@ Orbit Remapper を作る人・試す人向けの入口です。使い方は [doc
 | [`docs/`](../docs/README.md) | 使う人向けの文書と画像 |
 | `dev/drafts/` | 開発の記録。日付ごとのフォルダで、確定版ではない |
 | [`dev/experiments/q31-s3-two-ble/`](experiments/q31-s3-two-ble/README.md) | Q31 の実験（M5Dial で BLE 機器 2 台を 7.5 ms で受ける試験プログラム） |
+| `dev/tools/build/` | ビルドして、出来た `.bin` に決まった名前を付けるスクリプト。CI・リリース・手元で同じものを使う |
 | [`dev/tools/serial-capture/`](tools/serial-capture/README.md) | ログの COM ポートをファイルに残す PowerShell のスクリプト |
 | `dev/artifacts/drafts/` | 当初の筐体案（E1）の CAD と検査記録。今の構成ではなく、経緯として残している |
 
@@ -23,6 +24,14 @@ idf.py build merge-bin
 ```
 
 詳しくは [firmware/orbit/README.md](../firmware/orbit/README.md#2-ビルドと書き込み)。
+
+CI（`.github/workflows/build.yml`）と同じ手順でビルドし、決まった名前を付けるには、リポジトリのルートで：
+
+```sh
+dev/tools/build/build-firmware.sh
+```
+
+`firmware/orbit/build/orbit_hid-remapper_v<版>_<日付>-<コミット>.bin` ができる（名前の決まりは ai-agent-playbook の `domains/keyboard/firmware-naming.md`）。中身は `merged-binary.bin` と同じ。横に、来歴の記録 `BUILD-INFO.json` もできる。PR ごとに CI でも同じビルドが走り、14 日間は Actions の生成物（`orbit-hid-remapper-firmware`）から両方を取れる。
 
 ## 記録の読み方
 
@@ -49,6 +58,37 @@ idf.py build merge-bin
 1. 変更をビルドし、`merged-binary.bin` を試験する人に渡す（`.bin` はリポジトリに入れない）。
 2. 試験する人が書き込み、`dev/tools/serial-capture/` でログを残し、手順書のとおりに試す。
 3. 結果を `dev/drafts/2026-09-27/reports/` に `<段階>-<版>-report.md` の名前で書く（例：`m2-4903ae1-report.md`）。ログの全文は入れず、要る行だけを抜き出す。
+
+## 版とリリース
+
+版の番号の付け方は、作者のほかのファームウェア（OLSK60 の QMK・RMK 版）と揃えている。
+
+- **形**：`X.Y.Z`（セマンティック バージョニング）。テスト版は `X.Y.Z-rc.N`。
+- **上げ方**：正式版の前なので 0.x。機能の段階が進んだら 2 桁目（2b → `0.2.0`）、不具合を直しただけなら 3 桁目（`0.2.1`）。保存した台帳や設定が引き継げなくなるとき、設定ツールとのやりとりの形（`tool.cc` の `PROTOCOL_VERSION`）が変わるときは、CHANGELOG に必ず書く（1.0 からは 1 桁目を上げる）。
+- **正本**：[`firmware/orbit/version.txt`](../firmware/orbit/version.txt)。上げるときは、このファイルと [CHANGELOG.md](../CHANGELOG.md) の節を同じ PR で直す。
+- **表示**：リリースのワークフローで作ったビルド（`ORBIT_RELEASE=1`）だけが、画面と起動時のログに `v0.1.0` と出す。それ以外のビルドは、今までどおりコミットの番号（`9758564` など）を出す。起動時の `START` 行の `version=` には、どのビルドでも `version.txt` の値が出る。
+- **USB**：bcdDevice に、版を BCD で入れる（0.1.0 → 0x0010。QMK の `device_version` と同じ形）。このため 2 桁目と 3 桁目は 0〜9 まで。10 になる前に 1 桁目を上げる。
+- **タグ**：`v<X.Y.Z>`。
+
+### リリースの手順
+
+リリースは `.github/workflows/release.yml` を手で実行して作る（OLSK60 の `promote-olsk60-release.yml` と同じ形）。タグを push しても動かない（開発の環境からはタグの push が通らないため）。
+
+1. `firmware/orbit/version.txt` を新しい版にし、`CHANGELOG.md` の `[Unreleased]` を `## [<版>] - <日付>` の節に確定する。PR にして `main` にマージする。
+2. Actions の「Release firmware」を、`version` に版の番号、`dry_run` を true（既定）のまま実行する。ビルド・確かめ・リリースノートの作成まで行い、ノートの全文をログに出す。タグとリリースは作らない。ログでノートと添付の名前を確かめる。
+3. 同じ版で `dry_run` を false にして、`main` から実行する。タグ `v<版>` とリリースができる。
+
+ワークフローが止まるとき：入れた番号と `version.txt` が違う、CHANGELOG にその版の節が無い、同じタグかリリースがもうある、`dry_run` が false なのに `main` でない、ノートに個人情報らしいもの（ユーザー名の入ったパス、メールアドレス、6 バイトの完全なアドレス）がある、添付が決まった 5 つでない。
+
+| 添付 | 中身 |
+| --- | --- |
+| `Orbit_Remapper_firmware_v<版>_M5Dial.bin` | `0x0` に書く 1 ファイル。`ORBIT_RELEASE=1` でビルドし、画面に `v<版>` と出ることをワークフローが確かめる |
+| `Orbit_Remapper_firmware_v<版>_M5Dial.spdx` | SBOM（esp-idf-sbom 1.4.0、リンクしたものだけ） |
+| `Orbit_Remapper_firmware_v<版>_M5Dial_THIRD_PARTY_NOTICES.txt` | イメージに入っている第三者のソフトウェアのライセンスと著作権の表示。`dev/tools/build/third-party-licenses.py` がリンカーの map から作る |
+| `Orbit_Remapper_firmware_v<版>_M5Dial_BUILD-INFO.json` | 来歴の記録：リポジトリ、ref、求めたコミットと実際に checkout したコミット、ワークフローの実行、版、イメージの SHA-256。ファイル名ではなく、これを正本にする（ai-agent-playbook `common/verification-policy.md`「成果物の同一性と来歴」） |
+| `SHA256SUMS.txt` | 上の 4 つの SHA-256 |
+
+内部の名前（`orbit_hid-remapper_v<版>_<日付>-<コミット>.bin`）のイメージは、Actions の生成物 `orbit-hid-remapper-release` に 14 日間残る。`-rc.N` の付いた版は、プレリリースの印を付けて出す（「Latest」は直前の正式版のまま）。
 
 ## 守ること
 

@@ -1,7 +1,7 @@
 # Upstream
 
 This directory is a git subtree of upstream HID Remapper (decision I1 in
-`docs/drafts/2026-09-27/implementation-design.md`).
+`dev/drafts/2026-09-27/implementation-design.md`).
 
 | Item | Value |
 | --- | --- |

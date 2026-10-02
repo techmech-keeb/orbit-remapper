@@ -1,0 +1,50 @@
+# Builds the firmware on every pull request and on main, with the same
+# script as the release workflow (dev/tools/build/build-firmware.sh), so a
+# broken build shows up before a release does. The image and its
+# BUILD-INFO.json are kept as an artifact for 14 days; it is a test build (it reports the commit, not a
+# version) and is not a release.
+name: Build firmware
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (ESP-IDF v5.5.5)
+    runs-on: ubuntu-latest
+    container:
+      # espressif/idf:v5.5.5, pinned by digest
+      image: espressif/idf:v5.5.5@sha256:a9231d0697ab8f7517cc072e93b7c83e04907bfbfba80b6440d7dbbf90665cf2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build
+        shell: bash
+        env:
+          # A pull request checks out its merge commit; BUILD-INFO.json records both.
+          ORBIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -eu
+          # The container runs as root on a workspace owned by the runner.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          out="$(dev/tools/build/build-firmware.sh "$RUNNER_TEMP/build")"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -E '^(FW_BASE|BUILD_INFO)=' >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/build/BUILD-INFO.json"
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: orbit-hid-remapper-firmware
+          path: |
+            ${{ env.FW_BASE }}.bin
+            ${{ env.BUILD_INFO }}
+          if-no-files-found: error
+          retention-days: 14
