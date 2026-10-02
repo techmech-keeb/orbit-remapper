@@ -8,7 +8,7 @@
 
 Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本家から派生した独立プロジェクトで、本家の公式モデルや承認済みの製品ではありません。
 
-**開発中です。** 動作は作者の手元の機器（IST Trackball、Cube Turner PRO、Mistel MD600 など）で確かめた範囲に限られます。製品として完成したものではありません。
+**開発中です。** 動作は作者の手元の機器（IST Trackball、Mistel MD600 など）で確かめた範囲に限られます。製品として完成したものではありません。
 
 ## できること（2026-10 時点）
 

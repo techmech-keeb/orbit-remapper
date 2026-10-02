@@ -1,6 +1,6 @@
 # M1 の報告：版 `2cb6aad`（`orbit-m1-2cb6aad-ble.bin`、2026-09-30）
 
-利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の手順（要件 G-5：画面の押し込み 2 秒でペアリング待ちに入る／やめる、PR #24）を行った。`.bin` の SHA-256 は一致（`5a7ba462…0ce3`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。`M1` の行は全部ファイルに残した（`m1-2cb6aad-M1-lines.log` 2,818 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。
+利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の手順（要件 G-5：画面の押し込み 2 秒でペアリング待ちに入る／やめる、PR #24）を行った。`.bin` の SHA-256 は一致（`5a7ba462…0ce3`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。`M1` の行は全部ファイルに残した（`m1-2cb6aad-M1-lines.log` 2,818 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、機器 B（public `71:2c`）。
 
 ## 結論
 
@@ -8,12 +8,12 @@
 
 | 項目 | 結果 | 要点 |
 | --- | --- | --- |
-| **1. 書き込み後** | **合格** | 2 台とも `(stored key)`（Cube Turner は `, before the connect event`）。起動から 1.60 秒で 2 台そろう |
+| **1. 書き込み後** | **合格** | 2 台とも `(stored key)`（機器 B は `, before the connect event`）。起動から 1.60 秒で 2 台そろう |
 | **2. 2 台つながった状態で 2 秒押し込む** | **合格** | 21:35:18 `button held 2000 ms: pair new device` → `pair_new_device`。画面は `PAIRING 2/2`（利用者が確認）。**`scan start` は出なかった**（その後 21 秒間も出ていない） |
 | **3. もう一度 2 秒押し込む** | **合格** | 21:35:39 `button held 2000 ms: stop pairing` → `stop_pairing bonds=2`。画面は `WAIT` か `IDLE` に戻った（利用者が確認） |
-| **4. Cube Turner を切った状態で押し込む** | **合格** | 21:36:48 Cube Turner の電源を切る → 21:37:00 `button held 2000 ms: pair new device` → `pair_new_device` → `scan start (pairing)` → 21:37:06 探索でつかむ → 21:37:07 `encryption on (stored key) pairing mode, found by polling` → 同じ秒の状態の行で `pairing=0` → 21:37:08 `subscribed 6`（現れてから 2.07 秒）。画面の `PAIRING` の表示も消えた（利用者が確認） |
+| **4. 機器 B を切った状態で押し込む** | **合格** | 21:36:48 機器 B の電源を切る → 21:37:00 `button held 2000 ms: pair new device` → `pair_new_device` → `scan start (pairing)` → 21:37:06 探索でつかむ → 21:37:07 `encryption on (stored key) pairing mode, found by polling` → 同じ秒の状態の行で `pairing=0` → 21:37:08 `subscribed 6`（現れてから 2.07 秒）。画面の `PAIRING` の表示も消えた（利用者が確認） |
 | **5. 1 秒で離す** | **合格** | `button held` もペアリング待ちの行も出ず、画面にも変化なし（利用者が確認） |
-| **6. 5 分の使用** | **合格** | 21:39:00〜21:44:00。切断 0、2 台とも 290 秒すべて接続、`lost=0`。入力は IST 200 秒、Cube Turner 0 秒。`LAT` 16,870 件、平均 0.81 ms、**最大 2.45 ms**、`unrelated=0` |
+| **6. 5 分の使用** | **合格** | 21:39:00〜21:44:00。切断 0、2 台とも 290 秒すべて接続、`lost=0`。入力は IST 200 秒、機器 B 0 秒。`LAT` 16,870 件、平均 0.81 ms、**最大 2.45 ms**、`unrelated=0` |
 
 `WARNING`・`dropping the link`・`no answer`・止まる不具合・BLE ホストのリセット・`broken 128-bit UUID`：すべて 0 回。`button held` は 3 回（手順 2・3・4 の押し込みだけ）。A9：`heap_min` の最小 92,996。`lost=0`。A8：この版全体で `LAT` 24,685 件、平均 0.80 ms、最大 2.51 ms、`unrelated=0`。
 
@@ -32,7 +32,7 @@
 
 ## 気づいたこと
 
-- 手順 4 で、Cube Turner は探索で保存した鍵のままつかまった。`pairing mode` の受け入れでも、新しいペアリングにはならず、ペアリング待ちはその場で終わった（`pairing=0`）。
+- 手順 4 で、機器 B は探索で保存した鍵のままつかまった。`pairing mode` の受け入れでも、新しいペアリングにはならず、ペアリング待ちはその場で終わった（`pairing=0`）。
 - 手順書の注意どおり、書き込みの後の RST では画面に触れなかった（押し込んだまま RST すると書き込みモードに入る）。
 
 ## 時系列（PC の時刻、JST）
@@ -42,17 +42,17 @@
 | 21:29:51 | 1200 bps で書き込みモード → 書き込み → RST | 21:30:50 `START app=2cb6aad`、`bonds=2`。1.60 秒で 2 台そろう |
 | 21:35:16〜21:35:18 | **画面を 2 秒押し込む** | `pair_new_device`、`PAIRING 2/2`、`scan start` なし |
 | 21:35:37〜21:35:39 | **もう一度 2 秒押し込む** | `stop_pairing bonds=2`、`WAIT`／`IDLE` |
-| 21:36:48 | Cube Turner の電源を切る | 切断（`hci=0x08`） |
+| 21:36:48 | 機器 B の電源を切る | 切断（`hci=0x08`） |
 | 21:36:58〜21:37:00 | **画面を 2 秒押し込む** | `pair_new_device` → `scan start (pairing)` |
-| 21:37:06〜21:37:08 | Cube Turner の電源を入れる | 保存した鍵で受け入れ、`pairing=0`、`subscribed 6` |
+| 21:37:06〜21:37:08 | 機器 B の電源を入れる | 保存した鍵で受け入れ、`pairing=0`、`subscribed 6` |
 | 21:38 ごろ | **画面を 1 秒押し込む** | 何も起きない |
 | 21:39:00〜21:44:00 | **5 分の使用** | 切断 0、`lost=0`、`LAT` 最大 2.45 ms |
 
 ## 変わらないこと・未確認
 
-- Cube Turner の LED の点滅の意味（PC でも点滅する）。
-- スリープからの復帰（Cube Turner は自動で眠らない）。
-- 機器側で鍵を捨てたときの扱い（Cube Turner でペアリングを消す方法が分からない）。
+- 機器 B の LED の点滅の意味（PC でも点滅する）。
+- スリープからの復帰（機器 B は自動で眠らない）。
+- 機器側で鍵を捨てたときの扱い（機器 B でペアリングを消す方法が分からない）。
 - MD600・meteorite40 の回帰確認（手順書の「行う場合」）は行っていない。
 - 補正が働く機器（ゼロ埋めの 128 ビット UUID）はまだ無い。
 - A5（BIOS）は保留のまま。

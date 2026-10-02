@@ -1,6 +1,6 @@
 # M2 の報告：版 `230e758`（`orbit-m2-230e758-ble.bin`、2026-10-01）
 
-利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の確認（`cd199a3` ＋ 台帳を書く時機の条件の変更：期限 60 秒、期限後も入力が 200 ms 空くのを待つ、PR #27）を行った。`.bin` の SHA-256 は一致（`00c51265…ce4c`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は `102144d` と同じ方法で送った。IST を動かし続ける場面では、ログで入力が届いているのを確かめてから命令を送った。`M1` の行は全部ファイルに残した（`m2-230e758-M1-lines.log` 3,204 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。
+利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の確認（`cd199a3` ＋ 台帳を書く時機の条件の変更：期限 60 秒、期限後も入力が 200 ms 空くのを待つ、PR #27）を行った。`.bin` の SHA-256 は一致（`00c51265…ce4c`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は `102144d` と同じ方法で送った。IST を動かし続ける場面では、ログで入力が届いているのを確かめてから命令を送った。`M1` の行は全部ファイルに残した（`m2-230e758-M1-lines.log` 3,204 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、機器 B（public `71:2c`）。
 
 ## 結論
 
@@ -13,11 +13,11 @@
 | 項目 | 結果 | 要点 |
 | --- | --- | --- |
 | **1. IST を動かしながら `orbit alias 2 pedal`** | **待つ動きは合格、`LAT` は不合格** | 02:21:59 に命令。利用者は 65 秒以上止めずに動かし続け、命令から 64.7 秒後の 02:23:04 に `ledger saved (1860 B, 9.5 ms, why=set_alias)`（60 秒の期限を過ぎ、200 ms の切れ目で書いた）。命令から保存の前までの `LAT` は最大 2.16 ms、`unrelated=0`。**保存の秒の `LAT` は最大 9.04 ms**。`orbit alias 2`（入力なし）は命令の 1 ms 後に保存 |
-| **2. 動かしながら `orbit forget 2` → `orbit pair`（1 回目）** | **不合格（`WARNING`）** | `forget` の保存は直後に 1 回（`forced`）。`orbit pair` → Cube Turner の 1 回目の接続で **`WARNING: key replaced outside pairing mode`** → 切断 → 2 回目の接続でポート 2（下記 1）。この間、IST の入力がほぼ届かなかった（下記 3） |
+| **2. 動かしながら `orbit forget 2` → `orbit pair`（1 回目）** | **不合格（`WARNING`）** | `forget` の保存は直後に 1 回（`forced`）。`orbit pair` → 機器 B の 1 回目の接続で **`WARNING: key replaced outside pairing mode`** → 切断 → 2 回目の接続でポート 2（下記 1）。この間、IST の入力がほぼ届かなかった（下記 3） |
 | 2. 同じ（2 回目、02:31:46） | **保存は分かれた、`LAT` は合格** | 入力が 1 秒に 80 件以上届いているのを確かめてから送った。`forget` の保存は直後に 1 回（`forced`、その秒の `LAT` 5.43 ms）。`orbit pair` → `encryption on (new pairing) pairing mode`（NimBLE の知らせが普通に届いた）→ ポート 2、`held` から `hub_port=2` まで 0.99 秒。保存は **2 回**（`add` 33.5 ms、`set_map` 9.3 ms）。ペアリングの間に IST の入力が 6〜9 件/秒に落ち、それを「手が止まった」と判断して途中で書いた。`forced` の秒を除く `LAT` は最大 2.52 ms |
-| **3. 3 分の使用** | **合格** | 02:27:49〜02:30:49。切断 0、2 台とも 175 秒すべて接続、`lost=0`。`LAT` 8,183 件、平均 0.80 ms、**最大 2.71 ms**（3 ms を超える秒は 0）、`unrelated=0`。入力は IST 109 秒、Cube Turner 12 秒。この間の保存は 0 回 |
+| **3. 3 分の使用** | **合格** | 02:27:49〜02:30:49。切断 0、2 台とも 175 秒すべて接続、`lost=0`。`LAT` 8,183 件、平均 0.80 ms、**最大 2.71 ms**（3 ms を超える秒は 0）、`unrelated=0`。入力は IST 109 秒、機器 B 12 秒。この間の保存は 0 回 |
 
-書き込み後の起動では、保存 2 回（`touch` 9.2 ms、`touch` 35.4 ms）とも入力の前だった。Cube Turner は起動から 12.7 秒後につながった。
+書き込み後の起動では、保存 2 回（`touch` 9.2 ms、`touch` 35.4 ms）とも入力の前だった。機器 B は起動から 12.7 秒後につながった。
 
 `WARNING`：**1 回**。`ledger save failed`・`no answer`・止まる不具合・BLE ホストのリセット・`broken 128-bit UUID`：0 回。`dropping the link` は 4 回（`forgotten` 2 回、`key replaced outside pairing mode` 1 回、`nothing subscribed` 1 回）。`heap_min` の最小 87,488。A8：この版全体で `LAT` 27,621 件、平均 0.81 ms、最大 9.04 ms、`unrelated=0`。
 
@@ -39,7 +39,7 @@
 
 ### 1. ペアリングモードで誤った `WARNING` が出て、接続が切られる
 
-02:24:58 の流れ（Cube Turner、`orbit forget 2` の後の `orbit pair`）：
+02:24:58 の流れ（機器 B、`orbit forget 2` の後の `orbit pair`）：
 
 ```
 pair_new_device → scan start (pairing)
@@ -105,6 +105,6 @@ key replaced outside pairing mode, dropping the link
 ## 変わらないこと・未確認
 
 - MD600 の B5（自動引き継ぎ）・B6（組み直しの許可）は行っていない。
-- Cube Turner の LED の点滅の意味、スリープからの復帰、機器側で鍵を捨てたときの扱い。
+- 機器 B の LED の点滅の意味、スリープからの復帰、機器側で鍵を捨てたときの扱い。
 - 補正が働く機器（ゼロ埋めの 128 ビット UUID）はまだ無い。
 - A5（BIOS）は保留のまま。

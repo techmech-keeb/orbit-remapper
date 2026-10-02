@@ -467,7 +467,7 @@ static uint32_t key_tag(const ble_addr_t* addr) {
 }
 
 // What we hold for this device and what the link says about its security
-// (requirement G: the Cube Turner PRO never answers encryption with the
+// (requirement G: a test device never answers encryption with the
 // stored key, so show whether the pairing was bonded, Secure Connections
 // or legacy, and which keys each side distributed). Key values are never
 // printed.
@@ -499,7 +499,7 @@ static void restart_discovery_if_unsubscribed(dev_t* d);
 // The link is encrypted: say with which key, guard against pairing outside
 // pairing mode, and go on to discovery. Reached from the ENC_CHANGE event,
 // or from the connect event when the device encrypted the link on its own
-// before NimBLE posted the connect event (ff8e166 report, Cube Turner PRO:
+// before NimBLE posted the connect event (ff8e166 report, a test device:
 // its Security Request right after connecting made NimBLE restore the
 // stored key and post ENC_CHANGE while we did not know the link yet, so
 // the event was lost; our own encryption request on the already-encrypted
@@ -796,7 +796,7 @@ static void periodic_check(struct ble_npl_event* ev) {
         // as encrypted (bonded and key_size stay 0) but
         // ble_sm_process_result() leaves its loop before posting any event
         // (the "if (proc == NULL) break;" in ble_sm.c). That is what the
-        // Cube Turner PRO hits when its Security Request straddles the
+        // test device hits when its Security Request straddles the
         // connect event (9309d56 and f2093b6 reports: enc=1 bonded=0
         // key_size=0, no event). Why its procedure is gone by then is not
         // known; nothing is left pending in the SM either way. So look at
@@ -1698,7 +1698,7 @@ static int gap_event(struct ble_gap_event* event, void* arg) {
         if (rc == BLE_HS_EALREADY) {
             // The device started pairing on its own; ours is not needed.
             // Retrying after its pairing succeeds re-encrypts an encrypted
-            // link and the device drops it (a0d8f9e report, Cube Turner PRO).
+            // link and the device drops it (a0d8f9e report, a test device).
             struct ble_gap_conn_desc now_desc;
             if (ble_gap_conn_find(d->conn_handle, &now_desc) == 0) {
                 EVT(d, "device started security itself (enc=%u bonded=%u key_size=%u at this moment)",
