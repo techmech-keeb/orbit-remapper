@@ -80,7 +80,7 @@ idf.py build merge-bin
 | `orbit pair` / `orbit stop` | Pair new device と同じ／ペアリング待ちをやめる |
 | `orbit approve` | 組み直しの許可（画面の短い押し込みと同じ） |
 
-**設定ツール向けの命令**（HID 1 の feature report、番号 0x80 以上。本家の命令と形式は変えていない）：`GET_STATE`（0x80）、`GET_ROW`（0x81、行の番号）、`GET_TEXT`（0x82、ポートと種別）、`SET_ALIAS`（0x83）、`FORGET`（0x84）、`MOVE`（0x85）、`STOP_PAIRING`（0x86）、`APPROVE`（0x87）。応答の形は `main/tool.cc` の先頭。要件 F のツールはこれを使う。
+**設定ツール向けの命令**（HID 1 の feature report、番号 0x80 以上。本家の命令と形式は変えていない）：`GET_STATE`（0x80）、`GET_ROW`（0x81、行の番号）、`GET_TEXT`（0x82、ポートと種別）、`SET_ALIAS`（0x83）、`FORGET`（0x84）、`MOVE`（0x85）、`STOP_PAIRING`（0x86）、`APPROVE`（0x87）。応答の形は `main/tool.cc` の先頭。要件 F のツールはこれを使う。`GET_STATE` の最後は枠ごとの電池の残量（%、不明は 255）で、これを足したときに版（`PROTOCOL_VERSION`）を 2 にした。
 
 ## 4. 設定ツール
 
