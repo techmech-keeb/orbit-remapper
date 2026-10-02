@@ -35,7 +35,7 @@ dev/tools/build/build-firmware.sh
 
 ## 記録の読み方
 
-最初に読むもの：
+最初に読むもの（引き継ぎで来たら、先に [HANDOFF.md](HANDOFF.md)）：
 
 1. [要件と決定](drafts/2026-09-26/requirements.md)
 2. [実装の設計](drafts/2026-09-27/implementation-design.md)
