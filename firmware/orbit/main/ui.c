@@ -174,7 +174,10 @@ static void build(void) {
         shown.dot[i] = C_GREY;
         lv_obj_align(card_dot[i], LV_ALIGN_LEFT_MID, 0, 0);
         card_name[i] = make_label(card[i], &lv_font_montserrat_16, C_TEXT);
-        lv_obj_set_width(card_name[i], NAME_W);
+        // One line, fixed: a narrower name (the battery level takes its
+        // right end) is cut with dots instead of wrapping onto the second
+        // line (bat1-0f4c53d report: "IST TrackBall" broke after "IST").
+        lv_obj_set_size(card_name[i], NAME_W, lv_font_get_line_height(&lv_font_montserrat_16));
         lv_label_set_long_mode(card_name[i], LV_LABEL_LONG_MODE_DOTS);
         lv_obj_align(card_name[i], LV_ALIGN_TOP_LEFT, 16, -2);
         // Right of the name, on its line; the name gives up the width it takes.
