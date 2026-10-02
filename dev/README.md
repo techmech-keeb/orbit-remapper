@@ -51,6 +51,8 @@ dev/tools/build/build-firmware.sh
 | M2（台帳、機器ごとの設定） | [m2-brief.md](drafts/2026-09-30/m2-brief.md) | [m2-results.md](drafts/2026-09-30/m2-results.md) |
 | M3（画面） | [m3-screen.md](drafts/2026-10-01/m3-screen.md) | 同じ文書 |
 
+ほかの M5Stack の機器に広げるための整理（コアと UI の分かれ方、候補の機器）は [porting.md](drafts/2026-10-02/porting.md) にあります。
+
 2026-09-26 の資料の一覧は [drafts/2026-09-26/README.md](drafts/2026-09-26/README.md)、実機での試験の手順は [m1-handoff.md](drafts/2026-09-27/m1-handoff.md) にあります。
 
 ## 実機の試験の流れ
