@@ -91,6 +91,9 @@ uint8_t orbit_ble_port_battery(int port);
 // True for a minute after a device fell to 10 % or less (once per link,
 // again only after it was back at 15 % or more); port and level of that notice.
 bool orbit_ble_battery_notice(int* port, int* level);
+// Test aid (log command "orbit battery"): the device on port reads level %
+// until its next real value. Run on the host task.
+void orbit_ble_battery_test(int port, int level);
 
 // Requirement G: a bonded device asking to pair again outside pairing mode.
 typedef struct {

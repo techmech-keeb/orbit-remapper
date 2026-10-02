@@ -49,7 +49,7 @@ static void run(char* cmd) {
     verb = strtok(NULL, " ");
     if (verb == NULL || strcmp(verb, "help") == 0) {
         olog("M1 CMD commands: orbit list | forget <port> | move <new port> <old port> | alias <port> <text> | "
-             "pair | stop | approve\n");
+             "pair | stop | approve | battery <port> <percent>\n");
         return;
     }
     if (strcmp(verb, "list") == 0) {
@@ -78,6 +78,14 @@ static void run(char* cmd) {
     } else if (strcmp(verb, "stop") == 0) {
         olog("M1 CMD stop pairing\n");
         orbit_ble_stop_pairing();
+    } else if (strcmp(verb, "battery") == 0) {
+        // Test aid: shows a level as if the device had reported it.
+        const char* a = strtok(NULL, " ");
+        const char* b = strtok(NULL, " ");
+        int port = a != NULL ? atoi(a) : 0;
+        int level = b != NULL ? atoi(b) : -1;
+        olog("M1 CMD battery test port %d level %d\n", port, level);
+        orbit_ble_battery_test(port, level);
     } else if (strcmp(verb, "approve") == 0) {
         olog("M1 CMD approve\n");
         orbit_ble_approve();

@@ -259,7 +259,7 @@ static bool bonds_full_seen;     // a pairing was refused because the ledger is 
 
 // Ledger commands from other tasks (config tool, serial), run on the host task.
 typedef struct {
-    enum { CMD_FORGET, CMD_MOVE } kind;
+    enum { CMD_FORGET, CMD_MOVE, CMD_BATTERY_TEST } kind;
     int a, b;
 } cmd_t;
 static QueueHandle_t cmd_q;
@@ -994,6 +994,8 @@ static void restart_wait(void) {
     }
 }
 
+static void bat_set_level(dev_t* d, int i, const uint8_t* v, int len);
+
 static void run_commands(struct ble_npl_event* ev) {
     cmd_t c;
     while (xQueueReceive(cmd_q, &c, 0) == pdTRUE) {
@@ -1028,6 +1030,27 @@ static void run_commands(struct ble_npl_event* ev) {
             drop_links_of(&row.addr, "port changed");
             restart_wait();
             break;
+        case CMD_BATTERY_TEST: {
+            // Pretends the device on port a reported level b, until its next
+            // real read or notification (checks the colours and the notice).
+            dev_t* d = NULL;
+            for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
+                if (devs[i].connected && c.a != 0 && orbit_ledger_port(&devs[i].addr) == c.a) {
+                    d = &devs[i];
+                }
+            }
+            if (d == NULL || d->bat_n == 0 || c.b < 0 || c.b > 100) {
+                olog("M1 EVT t=%.3f battery test: port %d level %d not valid (connected, with a Battery Level, 0..100)\n",
+                     now_s(), c.a, c.b);
+                break;
+            }
+            EVT(d, "battery test: level=%d%% on all %d characteristic(s), until the next real value", c.b, d->bat_n);
+            uint8_t v = (uint8_t) c.b;
+            for (int i = 0; i < d->bat_n; i++) {
+                bat_set_level(d, i, &v, 1);
+            }
+            break;
+        }
         }
     }
 }
@@ -2520,6 +2543,10 @@ void orbit_ble_forget(int port) {
 
 void orbit_ble_move(int new_port, int old_port) {
     post_command((cmd_t) { .kind = CMD_MOVE, .a = new_port, .b = old_port });
+}
+
+void orbit_ble_battery_test(int port, int level) {
+    post_command((cmd_t) { .kind = CMD_BATTERY_TEST, .a = port, .b = level });
 }
 
 void orbit_ble_approve(void) {
