@@ -1,6 +1,6 @@
 # M3 の報告：版 `015df03`（`orbit-m3-015df03-ble.bin`、画面の 2 日目、2026-10-01）
 
-利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`docs/drafts/2026-10-01/m3-screen.md` §4 の試験を行った。`.bin` の SHA-256 は §4 の `829dfa84…d330` と一致。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。`M1` の行は全部ファイルに残した（`m3-015df03-M1-lines.log` 約 7,500 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。
+利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`dev/drafts/2026-10-01/m3-screen.md` §4 の試験を行った。`.bin` の SHA-256 は §4 の `829dfa84…d330` と一致。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。`M1` の行は全部ファイルに残した（`m3-015df03-M1-lines.log` 約 7,500 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。
 
 ## 結論
 

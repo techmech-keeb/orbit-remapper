@@ -11,8 +11,8 @@ finalized: false
 ## 何をしているか
 
 - リポジトリ：`techmech-keeb/orbit-remapper`（private、将来 OSS 公開前提）。
-- 試験プログラムは、ブランチ `claude/laughing-volta-r6lpn4` の `experiments/q31-s3-two-ble/` にある（ESP-IDF v5.5.5 と NimBLE）。PR はまだ作っていない。
-- 仕様は `docs/drafts/2026-09-26/q31-experiment-brief.md`、使い方とログの読み方は `experiments/q31-s3-two-ble/README.md` を読む。
+- 試験プログラムは、ブランチ `claude/laughing-volta-r6lpn4` の `dev/experiments/q31-s3-two-ble/` にある（ESP-IDF v5.5.5 と NimBLE）。PR はまだ作っていない。
+- 仕様は `dev/drafts/2026-09-26/q31-experiment-brief.md`、使い方とログの読み方は `dev/experiments/q31-s3-two-ble/README.md` を読む。
 - 目的：初代 M5Dial が BLE のキーボード・マウス 2 台を、どちらも 7.5 ms で 10 分以上安定して受けられるかを確かめる。受けられれば D 案（M5Dial 単体）、受けられなければ E 案（XIAO nRF52840 Plus＋M5Dial）。
 - このプログラムは受けた報告を数えるだけで、PC へ入力は送らない。Dial につながった機器は、PC では反応しなくて正しい。
 
@@ -48,6 +48,6 @@ finalized: false
 ## 守ること
 
 - 事実（測った値）と推測を分ける。測っていないことは「未確認」と書く。
-- 結果は、依頼書 §5 のとおり `docs/drafts/` に結果の文書を追加し、`open-questions.md` の Q31 と `history.md` を更新する。ログは抜粋だけを載せる。機器の完全なアドレスやペアリングの鍵は入れない。
+- 結果は、依頼書 §5 のとおり `dev/drafts/` に結果の文書を追加し、`open-questions.md` の Q31 と `history.md` を更新する。ログは抜粋だけを載せる。機器の完全なアドレスやペアリングの鍵は入れない。
 - コミットの author は `techmech <88352328+techmech-keeb@users.noreply.github.com>`。1 テーマ 1 コミット。
 - `main` には直接 push しない。作業ブランチを使う。

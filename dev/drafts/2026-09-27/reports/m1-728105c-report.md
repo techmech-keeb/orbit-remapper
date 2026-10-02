@@ -1,6 +1,6 @@
 # M1 の報告：版 `728105c`（`orbit-m1-728105c-A1-usb-only.bin`、2026-09-27）
 
-利用者の PC（Windows 11）と初代 M5Dial で、[m1-handoff.md](../../../o/docs/drafts/2026-09-27/m1-handoff.md) §6.1 を確かめた。PC 側の USB の見え方は PowerShell（`Win32_PnPEntity`）、ログは `System.IO.Ports.SerialPort`（115200 bps、DTR/RTS あり）。`.bin` の SHA-256 は引き継ぎ文書の値と一致。**M5Dial は PC 本体のポートに直接つないだ。**
+利用者の PC（Windows 11）と初代 M5Dial で、[m1-handoff.md](../m1-handoff.md) §6.1 を確かめた。PC 側の USB の見え方は PowerShell（`Win32_PnPEntity`）、ログは `System.IO.Ports.SerialPort`（115200 bps、DTR/RTS あり）。`.bin` の SHA-256 は引き継ぎ文書の値と一致。**M5Dial は PC 本体のポートに直接つないだ。**
 
 ## 結論
 

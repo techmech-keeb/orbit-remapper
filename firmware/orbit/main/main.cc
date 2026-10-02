@@ -1,5 +1,5 @@
 // Orbit M1: upstream HID Remapper on the M5Dial (ESP32-S3).
-// See docs/drafts/2026-09-27/m1-brief.md.
+// See dev/drafts/2026-09-27/m1-brief.md.
 //
 // The main loop mirrors main() in upstream's firmware-bluetooth/src/main.cc
 // and firmware/src/main.cc (51ab8b3). It is the only task that calls the

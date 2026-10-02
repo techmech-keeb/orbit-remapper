@@ -32,15 +32,15 @@ Release はまだ作っていません。それまで生成物と分割 ZIP は�
 
 ## このリポジトリにあるE1データ
 
-- [当時のREADME](../../../artifacts/drafts/2026-09-26/e1-v0.3/README.md)（原本のまま。README に載っている STL・PNG・HTML・PDF・メーカー画像はこのリポジトリにはありません）
-- [CAD生成ソース](../../../artifacts/drafts/2026-09-26/e1-v0.3/cad/build_model.py)
-- [組立STEP](../../../artifacts/drafts/2026-09-26/e1-v0.3/cad/assembly_review.step) と各部品の STEP
-- [PCB機械外形DXF](../../../artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_outline_NPTH.dxf)
-- [部品配置CSV](../../../artifacts/drafts/2026-09-26/e1-v0.3/component_positions.csv)
-- [干渉等の検査記録](../../../artifacts/drafts/2026-09-26/e1-v0.3/fit_checks.json)、[STL検査記録](../../../artifacts/drafts/2026-09-26/e1-v0.3/mesh_checks.json)
+- [当時のREADME](../../artifacts/drafts/2026-09-26/e1-v0.3/README.md)（原本のまま。README に載っている STL・PNG・HTML・PDF・メーカー画像はこのリポジトリにはありません）
+- [CAD生成ソース](../../artifacts/drafts/2026-09-26/e1-v0.3/cad/build_model.py)
+- [組立STEP](../../artifacts/drafts/2026-09-26/e1-v0.3/cad/assembly_review.step) と各部品の STEP
+- [PCB機械外形DXF](../../artifacts/drafts/2026-09-26/e1-v0.3/cad/PCB_outline_NPTH.dxf)
+- [部品配置CSV](../../artifacts/drafts/2026-09-26/e1-v0.3/component_positions.csv)
+- [干渉等の検査記録](../../artifacts/drafts/2026-09-26/e1-v0.3/fit_checks.json)、[STL検査記録](../../artifacts/drafts/2026-09-26/e1-v0.3/mesh_checks.json)
 - 描画・PDF・ビューアの生成コード（`drawings/render_views.py`、`build_report.py`、`build_viewer.py`）
-- [E1採用コンセプト画像](../../../artifacts/drafts/2026-09-26/e1-v0.3/references/selected_E1_concept.png)（生成画像）
-- [第三者素材の出典](../../../artifacts/drafts/2026-09-26/e1-v0.3/references/README.md)
+- [E1採用コンセプト画像](../../artifacts/drafts/2026-09-26/e1-v0.3/references/selected_E1_concept.png)（生成画像）
+- [第三者素材の出典](../../artifacts/drafts/2026-09-26/e1-v0.3/references/README.md)
 
 ## 保存時の確認（当初の格納時）
 
@@ -50,6 +50,6 @@ Release はまだ作っていません。それまで生成物と分割 ZIP は�
 
 ## 再生成時の注意
 
-E1はCadQuery 2.7を使った生成コードです。`cad/parameters.json`は出力記録であり編集入力ではありません。生成・STL検査・描画・PDF・HTMLの手順は当時のREADMEを参照してください。PDF の再生成には、メーカーの寸法図と IPAex フォントを手元で用意する必要があります（[references/README.md](../../../artifacts/drafts/2026-09-26/e1-v0.3/references/README.md)）。仕分けの作業では再生成していません。
+E1はCadQuery 2.7を使った生成コードです。`cad/parameters.json`は出力記録であり編集入力ではありません。生成・STL検査・描画・PDF・HTMLの手順は当時のREADMEを参照してください。PDF の再生成には、メーカーの寸法図と IPAex フォントを手元で用意する必要があります（[references/README.md](../../artifacts/drafts/2026-09-26/e1-v0.3/references/README.md)）。仕分けの作業では再生成していません。
 
 第三者のメーカー資料やフォントは出典・ライセンスを維持します。資料整理によって、第三者資産まで新しい一括ライセンスへ変更した扱いにはしません。

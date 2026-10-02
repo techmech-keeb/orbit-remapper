@@ -18,7 +18,7 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 - 登録済みの機器が組み直しを求めたときは、本体で許可するまでつながない。
 - 画面：状態の色のリング、機器のカード、ダイヤルで操作するメニュー（ペアリング、削除、画面の回転、画面を消すまでの時間）。
 
-これからの予定（機器ごとのレイヤー、切断時の押しっぱなしの解除、設定セット、LED の送り返し）は [M2 の依頼書](docs/drafts/2026-09-30/m2-brief.md) にあります。
+これからの予定（機器ごとのレイヤー、切断時の押しっぱなしの解除、設定セット、LED の送り返し）は [M2 の依頼書](dev/drafts/2026-09-30/m2-brief.md) にあります。
 
 ## 使い方と作り方
 
@@ -27,22 +27,22 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 
 ## 資料
 
-開発の記録は `docs/drafts/` にあります。日付ごとのフォルダで、確定版ではありません。
+開発の記録は `dev/drafts/` にあります。日付ごとのフォルダで、確定版ではありません。
 
-- [要件と決定](docs/drafts/2026-09-26/requirements.md)
-- [実装の設計](docs/drafts/2026-09-27/implementation-design.md)
-- [M1 の結果](docs/drafts/2026-09-27/m1-results.md)、[M2 の結果](docs/drafts/2026-09-30/m2-results.md)
-- [画面（M3）](docs/drafts/2026-10-01/m3-screen.md)
-- [未解決事項](docs/drafts/2026-09-26/open-questions.md)
-- [設計の経緯](docs/drafts/2026-09-26/history.md)
-- 実機の試験の報告：`docs/drafts/2026-09-27/reports/`
+- [要件と決定](dev/drafts/2026-09-26/requirements.md)
+- [実装の設計](dev/drafts/2026-09-27/implementation-design.md)
+- [M1 の結果](dev/drafts/2026-09-27/m1-results.md)、[M2 の結果](dev/drafts/2026-09-30/m2-results.md)
+- [画面（M3）](dev/drafts/2026-10-01/m3-screen.md)
+- [未解決事項](dev/drafts/2026-09-26/open-questions.md)
+- [設計の経緯](dev/drafts/2026-09-26/history.md)
+- 実機の試験の報告：`dev/drafts/2026-09-27/reports/`
 
-当初の筐体案（E1）の CAD と検査記録は `artifacts/drafts/` に経緯として残しています。今の構成ではありません。
+当初の筐体案（E1）の CAD と検査記録は `dev/artifacts/drafts/` に経緯として残しています。今の構成ではありません。
 
 ## 注意
 
 - **PR の番号**：資料に出てくる「PR #16」などの番号は、2026-10-02 に公開するまで使っていた非公開の開発リポジトリのものです。このリポジトリの PR とは対応しません。そのころの変更は、`main` の履歴のマージコミット（「Merge pull request #16 …」）でたどれます。
-- **USB の VID/PID と製品名**：今は本家の Web 設定ツールをそのまま使うため、本家と同じ `0xCAFE` / `0xBAF2` と「HID Remapper Bluetooth」という製品名を名乗ります。正式な割り当てではありません（[Q35](docs/drafts/2026-09-26/open-questions.md)）。
+- **USB の VID/PID と製品名**：今は本家の Web 設定ツールをそのまま使うため、本家と同じ `0xCAFE` / `0xBAF2` と「HID Remapper Bluetooth」という製品名を名乗ります。正式な割り当てではありません（[Q35](dev/drafts/2026-09-26/open-questions.md)）。
 - **名前**：「Orbit」はリポジトリ名として使っているだけで、商標の確認はしていません。
 - **ログ**：ファームウェアのログには、機器のアドレスの下位 2 バイトだけを出します。ペアリングの鍵や M5Dial の MAC アドレスは出しません。
 

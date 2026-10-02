@@ -46,7 +46,7 @@ BLE 版の主ループ（`main.cc` の `main()`）：受信した報告をキュ
 
 | 層 | 元にするもの |
 | --- | --- |
-| NimBLE の HOGP 受信 | **Q31 の `experiments/q31-s3-two-ble/main/ble_central.c` が種**。接続時に 7.5 ms を指定、GATT サーバー有効、自分から暗号化、`esp_hidh` を使わない（q31-results.md §3・§5） |
+| NimBLE の HOGP 受信 | **Q31 の `dev/experiments/q31-s3-two-ble/main/ble_central.c` が種**。接続時に 7.5 ms を指定、GATT サーバー有効、自分から暗号化、`esp_hidh` を使わない（q31-results.md §3・§5） |
 | TinyUSB の機器側 | 本家 **USB 版**の `tinyusb_stuff.cc`（F4-2、F4-3 のため） |
 | 主ループ | 本家 BLE 版 `main.cc` の写し |
 | 画面の部品 | Q31 の `display.c` は試験用。製品は LVGL（`esp_lvgl_port`）に置き換える |

@@ -2,7 +2,7 @@
 
 // BLE central (NimBLE): connects up to ORBIT_MAX_DEVS HID-over-GATT devices
 // and hands what the core needs to the main loop through queues. Nothing here
-// calls the core (decision I2). Grown from experiments/q31-s3-two-ble.
+// calls the core (decision I2). Grown from dev/experiments/q31-s3-two-ble.
 
 #include <stdbool.h>
 #include <stdint.h>
