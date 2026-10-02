@@ -2596,7 +2596,13 @@ bool orbit_ble_battery_notice(int* port, int* level) {
     *port = bat_notice.port;
     *level = bat_notice.level;
     portEXIT_CRITICAL(&stats_mux);
-    return on;
+    // Gone with the device: a disconnected device shows no level, so its
+    // notice would talk about nothing on the screen (bat1-36eb937 report).
+    bool connected = false;
+    for (int i = 0; on && i < ORBIT_MAX_DEVS; i++) {
+        connected |= *port != 0 && orbit_ble_slot_port(i) == *port;
+    }
+    return on && connected;
 }
 
 bool orbit_ble_duplicates(void) {

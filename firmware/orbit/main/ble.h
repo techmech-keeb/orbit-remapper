@@ -89,7 +89,8 @@ int orbit_ble_slot_port(int slot);            // ledger port of the device conne
 uint8_t orbit_ble_slot_battery(int slot);
 uint8_t orbit_ble_port_battery(int port);
 // True for a minute after a device fell to 10 % or less (once per link,
-// again only after it was back at 15 % or more); port and level of that notice.
+// again only after it was back at 15 % or more) while that device stays
+// connected; port and level of that notice.
 bool orbit_ble_battery_notice(int* port, int* level);
 // Test aid (log command "orbit battery"): the device on port reads level %
 // until its next real value. Run on the host task.
