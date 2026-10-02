@@ -9,6 +9,8 @@
 #     as CI does without it, and fails unless the image reports v<version>.
 #   - A version with "-" (0.2.0-rc.1) is marked as a pre-release, so
 #     "Latest release" stays on the last final version.
+#   - BUILD-INFO.json (commit, run, version, image SHA-256) is attached as
+#     the provenance record (ai-agent-playbook common/verification-policy.md).
 #   - The notes go through a check for personal information (paths with
 #     user names, mail addresses, full Bluetooth or MAC addresses).
 #
@@ -125,12 +127,14 @@ jobs:
         shell: bash
         env:
           ORBIT_RELEASE: "1"
+          ORBIT_HEAD_SHA: ${{ github.sha }}
         run: |
           set -eu
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           out="$(dev/tools/build/build-firmware.sh "$RUNNER_TEMP/build")"
           printf '%s\n' "$out"
-          printf '%s\n' "$out" | grep '^FW_BASE=' >> "$GITHUB_ENV"
+          printf '%s\n' "$out" | grep -E '^(FW_BASE|BUILD_INFO)=' >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/build/BUILD-INFO.json"
 
       - name: SBOM and third-party notices
         shell: bash
@@ -154,7 +158,15 @@ jobs:
           cp "$FW_BASE.bin" "assets/public/$public.bin"
           cp "$RUNNER_TEMP/sbom.spdx" "assets/public/$public.spdx"
           cp "$RUNNER_TEMP/notices.txt" "assets/public/${public}_THIRD_PARTY_NOTICES.txt"
-          cp "$FW_BASE.bin" assets/internal/
+          # The provenance record also names the image by its public name (same bytes).
+          python3 - "$BUILD_INFO" "assets/public/${public}_BUILD-INFO.json" "$public.bin" <<'PY'
+          import json, sys
+          src, out, public = sys.argv[1:4]
+          info = json.load(open(src))
+          info["files"][public] = next(iter(info["files"].values()))
+          json.dump(info, open(out, "w"), indent=2)
+          PY
+          cp "$FW_BASE.bin" "$BUILD_INFO" assets/internal/
           ls -l assets/public assets/internal
 
       - name: Upload the assets
@@ -186,7 +198,7 @@ jobs:
         working-directory: assets/public
         run: |
           set -eu
-          sha256sum -- *.bin *.spdx *.txt > SHA256SUMS.txt
+          sha256sum -- *.bin *.spdx *.txt *.json > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Release notes (CHANGELOG section + provenance)
@@ -216,7 +228,8 @@ jobs:
             printf -- '- `.bin`：初代 M5Dial に書き込むファームウェア（起動プログラム・パーティション表・アプリ入り）\n'
             printf -- '- `.spdx`：使っている部品の一覧（SBOM。esp-idf-sbom で作成）\n'
             printf -- '- `_THIRD_PARTY_NOTICES.txt`：ファームウェアに入っている第三者のソフトウェアのライセンスと著作権の表示\n'
-            printf -- '- `SHA256SUMS.txt`：上の 3 つの SHA-256\n\n'
+            printf -- '- `_BUILD-INFO.json`：どのコミットから、どの実行で作ったかの記録（来歴）\n'
+            printf -- '- `SHA256SUMS.txt`：上の 4 つの SHA-256\n\n'
             printf '## 出どころ\n\n'
             printf -- '- コミット：%s\n' "$GITHUB_SHA"
             printf -- '- 前のリリース：%s\n' "${PREVIOUS_TAG:-なし}"
@@ -239,11 +252,11 @@ jobs:
         run: |
           set -eu
           ls -1 assets/public
-          if find assets/public -type f | grep -Ev '/(Orbit_Remapper_firmware_v[^/]+_M5Dial(\.bin|\.spdx|_THIRD_PARTY_NOTICES\.txt)|SHA256SUMS\.txt)$'; then
+          if find assets/public -type f | grep -Ev '/(Orbit_Remapper_firmware_v[^/]+_M5Dial(\.bin|\.spdx|_THIRD_PARTY_NOTICES\.txt|_BUILD-INFO\.json)|SHA256SUMS\.txt)$'; then
             echo 'unexpected file in the public assets' >&2
             exit 1
           fi
-          test "$(find assets/public -type f | wc -l)" -eq 4
+          test "$(find assets/public -type f | wc -l)" -eq 5
 
       - name: Create the release
         if: ${{ inputs.dry_run == false }}

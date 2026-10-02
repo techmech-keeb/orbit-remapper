@@ -31,7 +31,7 @@ CI（`.github/workflows/build.yml`）と同じ手順でビルドし、決まっ�
 dev/tools/build/build-firmware.sh
 ```
 
-`firmware/orbit/build/orbit_hid-remapper_v<版>_<日付>-<コミット>.bin` ができる（名前の決まりは ai-agent-playbook の `domains/keyboard/firmware-naming.md`）。中身は `merged-binary.bin` と同じ。PR ごとに CI でも同じビルドが走り、14 日間は Actions の生成物（`orbit-hid-remapper-firmware`）から取れる。
+`firmware/orbit/build/orbit_hid-remapper_v<版>_<日付>-<コミット>.bin` ができる（名前の決まりは ai-agent-playbook の `domains/keyboard/firmware-naming.md`）。中身は `merged-binary.bin` と同じ。横に、来歴の記録 `BUILD-INFO.json` もできる。PR ごとに CI でも同じビルドが走り、14 日間は Actions の生成物（`orbit-hid-remapper-firmware`）から両方を取れる。
 
 ## 記録の読み方
 
@@ -78,14 +78,15 @@ dev/tools/build/build-firmware.sh
 2. Actions の「Release firmware」を、`version` に版の番号、`dry_run` を true（既定）のまま実行する。ビルド・確かめ・リリースノートの作成まで行い、ノートの全文をログに出す。タグとリリースは作らない。ログでノートと添付の名前を確かめる。
 3. 同じ版で `dry_run` を false にして、`main` から実行する。タグ `v<版>` とリリースができる。
 
-ワークフローが止まるとき：入れた番号と `version.txt` が違う、CHANGELOG にその版の節が無い、同じタグかリリースがもうある、`dry_run` が false なのに `main` でない、ノートに個人情報らしいもの（ユーザー名の入ったパス、メールアドレス、6 バイトの完全なアドレス）がある、添付が決まった 4 つでない。
+ワークフローが止まるとき：入れた番号と `version.txt` が違う、CHANGELOG にその版の節が無い、同じタグかリリースがもうある、`dry_run` が false なのに `main` でない、ノートに個人情報らしいもの（ユーザー名の入ったパス、メールアドレス、6 バイトの完全なアドレス）がある、添付が決まった 5 つでない。
 
 | 添付 | 中身 |
 | --- | --- |
 | `Orbit_Remapper_firmware_v<版>_M5Dial.bin` | `0x0` に書く 1 ファイル。`ORBIT_RELEASE=1` でビルドし、画面に `v<版>` と出ることをワークフローが確かめる |
 | `Orbit_Remapper_firmware_v<版>_M5Dial.spdx` | SBOM（esp-idf-sbom 1.4.0、リンクしたものだけ） |
 | `Orbit_Remapper_firmware_v<版>_M5Dial_THIRD_PARTY_NOTICES.txt` | イメージに入っている第三者のソフトウェアのライセンスと著作権の表示。`dev/tools/build/third-party-licenses.py` がリンカーの map から作る |
-| `SHA256SUMS.txt` | 上の 3 つの SHA-256 |
+| `Orbit_Remapper_firmware_v<版>_M5Dial_BUILD-INFO.json` | 来歴の記録：リポジトリ、ref、求めたコミットと実際に checkout したコミット、ワークフローの実行、版、イメージの SHA-256。ファイル名ではなく、これを正本にする（ai-agent-playbook `common/verification-policy.md`「成果物の同一性と来歴」） |
+| `SHA256SUMS.txt` | 上の 4 つの SHA-256 |
 
 内部の名前（`orbit_hid-remapper_v<版>_<日付>-<コミット>.bin`）のイメージは、Actions の生成物 `orbit-hid-remapper-release` に 14 日間残る。`-rc.N` の付いた版は、プレリリースの印を付けて出す（「Latest」は直前の正式版のまま）。
 
