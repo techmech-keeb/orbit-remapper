@@ -45,7 +45,12 @@
 #define C_RED      0xff5252
 #define C_GREY     0x3a4450
 
-#define NAME_W 136 // card name width without a battery level
+// Cards are 184 px wide: the upper card's top corners then stay inside the
+// ring (half-width 95 px at 63 px above the centre). That leaves a 13
+// letter name like "IST TrackBall" (104 px) room beside "100%" (bat1-0f4c53d
+// report).
+#define CARD_W 184
+#define NAME_W (CARD_W - 32) // card name width without a battery level
 
 // Battery colours (battery.md §2): normal from 30 %, yellow 11..29 %, red at 10 % or less.
 #define BAT_YELLOW_BELOW 30
@@ -160,7 +165,7 @@ static void build(void) {
 
     for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
         card[i] = lv_obj_create(scr);
-        lv_obj_set_size(card[i], 168, 46);
+        lv_obj_set_size(card[i], CARD_W, 46);
         lv_obj_align(card[i], LV_ALIGN_CENTER, 0, -40 + i * 52);
         lv_obj_set_style_radius(card[i], 10, 0);
         lv_obj_set_style_pad_all(card[i], 6, 0);
@@ -583,7 +588,7 @@ static void show_battery(int i, uint8_t level) {
                           : level > 30 ? LV_SYMBOL_BATTERY_2
                           : level > 10 ? LV_SYMBOL_BATTERY_1
                                        : LV_SYMBOL_BATTERY_EMPTY;
-        snprintf(text, sizeof(text), "%s %u%%", sym, level);
+        snprintf(text, sizeof(text), "%s%u%%", sym, level); // no blank: the name keeps 3 px more
         color = level <= BAT_RED_AT ? C_RED : level < BAT_YELLOW_BELOW ? C_YELLOW : C_TEXT;
     }
     if (strncmp(shown.bat[i], text, sizeof(shown.bat[i])) != 0) {
@@ -593,7 +598,7 @@ static void show_battery(int i, uint8_t level) {
         if (text[0] != '\0') {
             lv_point_t size;
             lv_text_get_size(&size, text, &lv_font_montserrat_12, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-            w = size.x + 6;
+            w = size.x + 2; // with the 4 px the name leaves at the right, a 6 px gap
         }
         lv_obj_set_width(card_name[i], NAME_W - w);
     }
