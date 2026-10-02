@@ -70,6 +70,25 @@ dev/tools/build/build-firmware.sh
 - **USB**：bcdDevice に、版を BCD で入れる（0.1.0 → 0x0010。QMK の `device_version` と同じ形）。このため 2 桁目と 3 桁目は 0〜9 まで。10 になる前に 1 桁目を上げる。
 - **タグ**：`v<X.Y.Z>`。
 
+### リリースの手順
+
+リリースは `.github/workflows/release.yml` を手で実行して作る（OLSK60 の `promote-olsk60-release.yml` と同じ形）。タグを push しても動かない（開発の環境からはタグの push が通らないため）。
+
+1. `firmware/orbit/version.txt` を新しい版にし、`CHANGELOG.md` の `[Unreleased]` を `## [<版>] - <日付>` の節に確定する。PR にして `main` にマージする。
+2. Actions の「Release firmware」を、`version` に版の番号、`dry_run` を true（既定）のまま実行する。ビルド・確かめ・リリースノートの作成まで行い、ノートの全文をログに出す。タグとリリースは作らない。ログでノートと添付の名前を確かめる。
+3. 同じ版で `dry_run` を false にして、`main` から実行する。タグ `v<版>` とリリースができる。
+
+ワークフローが止まるとき：入れた番号と `version.txt` が違う、CHANGELOG にその版の節が無い、同じタグかリリースがもうある、`dry_run` が false なのに `main` でない、ノートに個人情報らしいもの（ユーザー名の入ったパス、メールアドレス、6 バイトの完全なアドレス）がある、添付が決まった 4 つでない。
+
+| 添付 | 中身 |
+| --- | --- |
+| `Orbit_Remapper_firmware_v<版>_M5Dial.bin` | `0x0` に書く 1 ファイル。`ORBIT_RELEASE=1` でビルドし、画面に `v<版>` と出ることをワークフローが確かめる |
+| `Orbit_Remapper_firmware_v<版>_M5Dial.spdx` | SBOM（esp-idf-sbom 1.4.0、リンクしたものだけ） |
+| `Orbit_Remapper_firmware_v<版>_M5Dial_THIRD_PARTY_NOTICES.txt` | イメージに入っている第三者のソフトウェアのライセンスと著作権の表示。`dev/tools/build/third-party-licenses.py` がリンカーの map から作る |
+| `SHA256SUMS.txt` | 上の 3 つの SHA-256 |
+
+内部の名前（`orbit_hid-remapper_v<版>_<日付>-<コミット>.bin`）のイメージは、Actions の生成物 `orbit-hid-remapper-release` に 14 日間残る。`-rc.N` の付いた版は、プレリリースの印を付けて出す（「Latest」は直前の正式版のまま）。
+
 ## 守ること
 
 - 本家のコア（`firmware/hid-remapper/`）は改造しない。やむを得ず直すときは、変更箇所に `// ORBIT:` の印を付ける。

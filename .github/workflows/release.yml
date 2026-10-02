@@ -1,0 +1,265 @@
+# Builds the firmware for a version and publishes it as a GitHub Release
+# with the tag v<version>. Same shape as the OLSK60 promote workflows
+# (rmk-config / qmk-config promote-olsk60-release.yml), with one public
+# repository instead of a private and a public one.
+#
+#   - The input version must equal firmware/orbit/version.txt, and
+#     CHANGELOG.md must have a "## [<version>]" section (no empty notes).
+#   - The build uses dev/tools/build/build-firmware.sh with ORBIT_RELEASE=1,
+#     as CI does without it, and fails unless the image reports v<version>.
+#   - A version with "-" (0.2.0-rc.1) is marked as a pre-release, so
+#     "Latest release" stays on the last final version.
+#   - The notes go through a check for personal information (paths with
+#     user names, mail addresses, full Bluetooth or MAC addresses).
+#
+# Run from workflow_dispatch only: a tag push from the development
+# environment is refused by its proxy. dry_run (the default) does all of
+# the above and prints the notes, but creates no tag and no release; it
+# may run from any branch, a real run only from main.
+name: Release firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (0.1.0, 0.2.0-rc.1 or v0.1.0). Must equal firmware/orbit/version.txt'
+        required: true
+        type: string
+      dry_run:
+        description: 'Build and check only; create no tag and no release'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Check the version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      tag: ${{ steps.parse.outputs.tag }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
+      previous_tag: ${{ steps.prev.outputs.previous_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Parse and check the version
+        id: parse
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+          version="${INPUT_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            printf 'Invalid version format: %s\n' "$version" >&2
+            exit 1
+          fi
+          file_version="$(head -n 1 firmware/orbit/version.txt)"
+          if [ "$version" != "$file_version" ]; then
+            printf 'version mismatch: input=%s version.txt=%s\n' "$version" "$file_version" >&2
+            printf 'Raise firmware/orbit/version.txt first (dev/README.md "版とリリース")\n' >&2
+            exit 1
+          fi
+          if ! awk -v h="## [$version]" 'index($0, h) == 1 {found=1} END {exit !found}' CHANGELOG.md; then
+            printf 'CHANGELOG.md has no "## [%s]" section; settle [Unreleased] first\n' "$version" >&2
+            exit 1
+          fi
+          if [ "$DRY_RUN" != "true" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            printf 'A real release runs from main only (this run: %s)\n' "$GITHUB_REF" >&2
+            exit 1
+          fi
+          prerelease=false
+          [[ "$version" == *-* ]] && prerelease=true
+          {
+            printf 'version=%s\n' "$version"
+            printf 'tag=v%s\n' "$version"
+            printf 'prerelease=%s\n' "$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check that the release does not exist yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.parse.outputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+             || gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > /dev/null 2>&1; then
+            if [ "$DRY_RUN" = "true" ]; then
+              printf 'warning: %s already exists; a real run would stop here\n' "$TAG"
+              exit 0
+            fi
+            printf '%s already exists\n' "$TAG" >&2
+            exit 1
+          fi
+
+      - name: Find the previous release
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          previous_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[0].tagName // ""')"
+          printf 'Previous release: %s\n' "${previous_tag:-none}"
+          printf 'previous_tag=%s\n' "$previous_tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build v${{ needs.validate.outputs.version }}
+    needs: validate
+    runs-on: ubuntu-latest
+    container:
+      # espressif/idf:v5.5.5, pinned by digest (the same as build.yml)
+      image: espressif/idf:v5.5.5@sha256:a9231d0697ab8f7517cc072e93b7c83e04907bfbfba80b6440d7dbbf90665cf2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build (release)
+        shell: bash
+        env:
+          ORBIT_RELEASE: "1"
+        run: |
+          set -eu
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          out="$(dev/tools/build/build-firmware.sh "$RUNNER_TEMP/build")"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep '^FW_BASE=' >> "$GITHUB_ENV"
+
+      - name: SBOM and third-party notices
+        shell: bash
+        run: |
+          set -eu
+          . "$IDF_PATH/export.sh" > /dev/null
+          python -m pip install --quiet esp-idf-sbom==1.4.0
+          desc="$RUNNER_TEMP/build/project_description.json"
+          python -m esp_idf_sbom create --rem-config --rem-unused "$desc" -o "$RUNNER_TEMP/sbom.spdx"
+          python -m esp_idf_sbom license --packages --format json "$desc" -o "$RUNNER_TEMP/licenses.json"
+          python dev/tools/build/third-party-licenses.py "$RUNNER_TEMP/build" "$RUNNER_TEMP/licenses.json" "$RUNNER_TEMP/notices.txt"
+
+      - name: Collect the assets (public = user-facing names, internal = naming standard)
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -eu
+          mkdir -p assets/public assets/internal
+          public="Orbit_Remapper_firmware_v${VERSION}_M5Dial"
+          cp "$FW_BASE.bin" "assets/public/$public.bin"
+          cp "$RUNNER_TEMP/sbom.spdx" "assets/public/$public.spdx"
+          cp "$RUNNER_TEMP/notices.txt" "assets/public/${public}_THIRD_PARTY_NOTICES.txt"
+          cp "$FW_BASE.bin" assets/internal/
+          ls -l assets/public assets/internal
+
+      - name: Upload the assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: orbit-hid-remapper-release
+          path: assets/**
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Notes and release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download the assets
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: orbit-hid-remapper-release
+          path: assets
+
+      - name: Checksums
+        working-directory: assets/public
+        run: |
+          set -eu
+          sha256sum -- *.bin *.spdx *.txt > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Release notes (CHANGELOG section + provenance)
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          PREVIOUS_TAG: ${{ needs.validate.outputs.previous_tag }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          set -eu
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 {flag=1; next}
+            /^## \[/ && flag {flag=0}
+            /^\[[^]]+\]: / {next}
+            flag {print}
+          ' CHANGELOG.md > changelog-section.md
+          upstream="$(grep -Eo 'ORBIT_UPSTREAM_COMMIT="[0-9a-f]+"' firmware/orbit/components/hid_remapper_core/CMakeLists.txt | grep -Eo '[0-9a-f]{7,}')"
+          {
+            if [ "$PRERELEASE" = "true" ]; then
+              printf '> **テスト版です。** 正式版ではありません。問題があれば、直前の正式版を書き込み直してください。\n\n'
+            fi
+            cat changelog-section.md
+            printf '\n## 書き込み\n\n'
+            printf '`Orbit_Remapper_firmware_v%s_M5Dial.bin` を、アドレス `0x0` に書き込みます。' "$VERSION"
+            printf '手順は [はじめに](https://github.com/%s/blob/v%s/docs/getting-started.md) にあります。' "$GITHUB_REPOSITORY" "$VERSION"
+            printf 'ペアリングの情報と設定は消えません。\n\n'
+            printf '## 添付\n\n'
+            printf -- '- `.bin`：初代 M5Dial に書き込むファームウェア（起動プログラム・パーティション表・アプリ入り）\n'
+            printf -- '- `.spdx`：使っている部品の一覧（SBOM。esp-idf-sbom で作成）\n'
+            printf -- '- `_THIRD_PARTY_NOTICES.txt`：ファームウェアに入っている第三者のソフトウェアのライセンスと著作権の表示\n'
+            printf -- '- `SHA256SUMS.txt`：上の 3 つの SHA-256\n\n'
+            printf '## 出どころ\n\n'
+            printf -- '- コミット：%s\n' "$GITHUB_SHA"
+            printf -- '- 前のリリース：%s\n' "${PREVIOUS_TAG:-なし}"
+            printf -- '- 本家 HID Remapper：%s（`firmware/hid-remapper/`、無改造）\n' "$upstream"
+            printf -- '- ESP-IDF：v5.5.5（コンテナ `espressif/idf:v5.5.5`）\n'
+            printf -- '- ビルド：%s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+          } > release-notes.md
+          printf -- '---- release-notes.md ----\n'; cat release-notes.md
+
+      - name: Check the notes for personal information
+        run: |
+          set -eu
+          # Paths with a user name, mail addresses, full 6-byte addresses.
+          if grep -nEi '[A-Z]:\\Users\\|/home/[a-z]|/Users/[A-Za-z]|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|([0-9a-f]{2}:){5}[0-9a-f]{2}' release-notes.md; then
+            echo 'release-notes.md looks like it carries personal information (see the lines above)' >&2
+            exit 1
+          fi
+
+      - name: Check the assets
+        run: |
+          set -eu
+          ls -1 assets/public
+          if find assets/public -type f | grep -Ev '/(Orbit_Remapper_firmware_v[^/]+_M5Dial(\.bin|\.spdx|_THIRD_PARTY_NOTICES\.txt)|SHA256SUMS\.txt)$'; then
+            echo 'unexpected file in the public assets' >&2
+            exit 1
+          fi
+          test "$(find assets/public -type f | wc -l)" -eq 4
+
+      - name: Create the release
+        if: ${{ inputs.dry_run == false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          set -eu
+          extra=()
+          [ "$PRERELEASE" = "true" ] && extra+=(--prerelease)
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Orbit Remapper v${VERSION}" \
+            --notes-file release-notes.md \
+            "${extra[@]}" \
+            assets/public/*

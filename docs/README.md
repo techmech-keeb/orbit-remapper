@@ -12,5 +12,5 @@ Orbit Remapper を使う人向けの説明です。作り方や開発の記録�
 ## 先に知っておいてほしいこと
 
 - **開発中です。** 動作を確かめたのは、作者の手元の機器（IST Trackball、Cube Turner PRO、Mistel MD600 など）だけです。
-- **ビルド済みのファームウェアは、今は配布していません。** 自分でビルドする必要があります（[はじめに](getting-started.md#2-ファームウェアを用意する)）。
+- ファームウェアは [Releases](https://github.com/techmech-keeb/orbit-remapper/releases) から取れます（[はじめに](getting-started.md#2-ファームウェアを用意する)）。
 - BIOS の画面で使えるか、PC をスリープから起こせるか（リモートウェイクアップ）は、まだ確かめていません。
