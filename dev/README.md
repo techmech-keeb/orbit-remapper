@@ -11,6 +11,7 @@ Orbit Remapper を作る人・試す人向けの入口です。使い方は [doc
 | [`docs/`](../docs/README.md) | 使う人向けの文書と画像 |
 | `dev/drafts/` | 開発の記録。日付ごとのフォルダで、確定版ではない |
 | [`dev/experiments/q31-s3-two-ble/`](experiments/q31-s3-two-ble/README.md) | Q31 の実験（M5Dial で BLE 機器 2 台を 7.5 ms で受ける試験プログラム） |
+| `dev/tools/build/` | ビルドして、出来た `.bin` に決まった名前を付けるスクリプト。CI・リリース・手元で同じものを使う |
 | [`dev/tools/serial-capture/`](tools/serial-capture/README.md) | ログの COM ポートをファイルに残す PowerShell のスクリプト |
 | `dev/artifacts/drafts/` | 当初の筐体案（E1）の CAD と検査記録。今の構成ではなく、経緯として残している |
 
@@ -23,6 +24,14 @@ idf.py build merge-bin
 ```
 
 詳しくは [firmware/orbit/README.md](../firmware/orbit/README.md#2-ビルドと書き込み)。
+
+CI（`.github/workflows/build.yml`）と同じ手順でビルドし、決まった名前を付けるには、リポジトリのルートで：
+
+```sh
+dev/tools/build/build-firmware.sh
+```
+
+`firmware/orbit/build/orbit_hid-remapper_v<版>_<日付>-<コミット>.bin` ができる（名前の決まりは ai-agent-playbook の `domains/keyboard/firmware-naming.md`）。中身は `merged-binary.bin` と同じ。PR ごとに CI でも同じビルドが走り、14 日間は Actions の生成物（`orbit-hid-remapper-firmware`）から取れる。
 
 ## 記録の読み方
 
