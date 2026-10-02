@@ -1,6 +1,6 @@
 # Orbit Remapper
 
-初代 M5Dial（ESP32-S3）1 台で、Bluetooth のキーボードやマウスを受け取り、[HID Remapper](https://github.com/jfedor2/hid-remapper) のコアでリマップして、USB で PC に出す卓上リマッパーです。丸い画面とダイヤルで、つながっている機器の状態を見たり、ペアリングを管理したりできます。
+M5Dial（ESP32-S3）1 台で、Bluetooth のキーボードやマウスを受け取り、[HID Remapper](https://github.com/jfedor2/hid-remapper) のコアでリマップして、USB で PC に出す卓上リマッパーです。丸い画面とダイヤルで、つながっている機器の状態を見たり、ペアリングを管理したりできます。
 
 ![初代 M5Dial の画面。緑のリングの内側に「ORBIT 3/15」、IST TrackBall（P1、7.50 ms）と MISTEL-1（P3、7.50 ms）の 2 枚のカード、「2 devices connected」、「USB mounted e72c27a」が表示されている。右にトラックボール、奥にキーボード](docs/images/orbit-m5dial-2026-10.jpg)
 
@@ -8,7 +8,7 @@
 
 Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本家から派生した独立プロジェクトで、本家の公式モデルや承認済みの製品ではありません。
 
-**開発中です。** 動作は作者の手元の機器（IST Trackball、Mistel MD600 など）で確かめた範囲に限られます。製品として完成したものではありません。
+**開発中です。** 動作は、初代 M5Dial と作者の手元の機器（IST Trackball、Mistel MD600 など）で確かめた範囲に限られます。製品として完成したものではありません。
 
 ## できること（2026-10 時点）
 
