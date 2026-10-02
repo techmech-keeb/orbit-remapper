@@ -16,6 +16,7 @@ extern "C" {
 #define ORBIT_MAX_DEVS 2
 #define ORBIT_REPORT_MAX 64
 #define ORBIT_REPORT_MAP_MAX 512
+#define ORBIT_BATTERY_UNKNOWN 255 // no Battery Service, not read yet, or not connected
 
 // An input report from a device. interface = slot << 8, as upstream's
 // Bluetooth build. report_id is 0 when the device's reports carry no IDs.
@@ -53,6 +54,7 @@ typedef struct {
     uint32_t gaps[GAP_BUCKETS];
     uint32_t total_reports;
     uint32_t disconnects;
+    uint8_t battery;    // lowest Battery Level in %, or ORBIT_BATTERY_UNKNOWN
 } orbit_dev_stats_t;
 
 // wake is notified (xTaskNotifyGive) whenever something is queued.
@@ -82,6 +84,13 @@ void orbit_ble_move(int new_port, int old_port); // the device on new_port takes
 bool orbit_ble_bonds_full(void);              // a pairing was refused because all 15 ports are taken
 bool orbit_ble_duplicates(void);              // two or more ledger rows look like one device; the user picks
 int orbit_ble_slot_port(int slot);            // ledger port of the device connected on slot, 0 when none
+// Battery: the lowest Battery Level of a device in %, or ORBIT_BATTERY_UNKNOWN.
+// Kept in memory only and forgotten when the device disconnects.
+uint8_t orbit_ble_slot_battery(int slot);
+uint8_t orbit_ble_port_battery(int port);
+// True for a minute after a device fell to 10 % or less (once per link,
+// again only after it was back at 15 % or more); port and level of that notice.
+bool orbit_ble_battery_notice(int* port, int* level);
 
 // Requirement G: a bonded device asking to pair again outside pairing mode.
 typedef struct {
