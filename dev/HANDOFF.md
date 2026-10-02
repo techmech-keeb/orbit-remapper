@@ -9,12 +9,12 @@
 | リポジトリ | `techmech-keeb/orbit-remapper`（public、2026-10-02 公開）。`main` は `9e4f7c5` |
 | リリース | `v0.1.0`（2026-10-02、コミット `a47ccc0`）。添付 5 つ、照合済み |
 | 開いている PR | techmech-keeb/orbit-remapper#5：電池の残量の段階 0（ブランチ `claude/laughing-volta-r6lpn4`、版 `8153e8b`）。実機の試験報告待ち |
-| 待っている報告 | ① `bat0-8153e8b-report.md`（電池の段階 0。手順は [battery.md](drafts/2026-10-02/battery.md) §3）② `bd6895d` の試験（古い鍵での繰り返しの直しと、画面なしでの `LAT` の切り分け。[m3-screen.md](drafts/2026-10-01/m3-screen.md) §6） |
+| 待っている報告 | ① `bat0-8153e8b-report.md`（電池の段階 0。手順は `drafts/2026-10-02/battery.md`（PR #5 のブランチにある。マージ後は `main` にも入る） §3）② `bd6895d` の試験（古い鍵での繰り返しの直しと、画面なしでの `LAT` の切り分け。[m3-screen.md](drafts/2026-10-01/m3-screen.md) §6） |
 | 利用者の答え待ち | ①「設定のページを開く」機能：既定の OS は Windows か、ページの置き場（GitHub Pages を使えるか）、第一段の中身 ② 本家を取り込み直すとき `git subtree pull --squash` にするか（Contributors を増やさないため） ③ ボードの層の整理（[porting.md](drafts/2026-10-02/porting.md) §1 の 1）を 2b の前にやるか |
 
 ## 2. 次にやること（利用者と合意した順番）
 
-1. 電池の段階 0 の報告を読み、段階 1（画面の表示など）の形を決めて作る（[battery.md](drafts/2026-10-02/battery.md) §2・§4）。
+1. 電池の段階 0 の報告を読み、段階 1（画面の表示など）の形を決めて作る（`battery.md` §2・§4）。
 2. 2b：機器ごとのレイヤーと、切断時の押下の解除。本家コアの唯一の改造になる予定（`// ORBIT:` の印を付ける）。依頼書は [m2-brief.md](drafts/2026-09-30/m2-brief.md)。
 3. 画面にレイヤーを表示する。
 4. 2c：設定セットと LED の送り返し。
@@ -53,7 +53,7 @@
 | 要件と決定、未解決事項、経緯 | [requirements.md](drafts/2026-09-26/requirements.md)、[open-questions.md](drafts/2026-09-26/open-questions.md)、[history.md](drafts/2026-09-26/history.md)（経緯の表は行 58 まで） |
 | 段階ごとの依頼書と結果 | dev/README.md の「記録の読み方」の表 |
 | 画面（M3） | [m3-screen.md](drafts/2026-10-01/m3-screen.md) |
-| 電池の残量 | [battery.md](drafts/2026-10-02/battery.md) |
+| 電池の残量 | `battery.md` |
 | ほかの機器への展開 | [porting.md](drafts/2026-10-02/porting.md) |
 | 試験の報告 | `dev/drafts/2026-09-27/reports/` |
 | 使う人向けの文書 | [docs/](../docs/README.md) |
