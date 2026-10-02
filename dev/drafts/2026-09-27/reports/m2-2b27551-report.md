@@ -1,6 +1,6 @@
 # M2 の報告：版 `2b27551`（`orbit-m2-2b27551-ble.bin`、2026-10-01）
 
-利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の短い確認（`747c13d` ＋ 台帳を書く時機の変更、PR #27）を行った。`.bin` の SHA-256 は一致（`23470bf5…2b54`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は `102144d` と同じ方法で送った。`M1` の行は全部ファイルに残した（`m2-2b27551-M1-lines.log` 5,733 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。
+利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の短い確認（`747c13d` ＋ 台帳を書く時機の変更、PR #27）を行った。`.bin` の SHA-256 は一致（`23470bf5…2b54`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は `102144d` と同じ方法で送った。`M1` の行は全部ファイルに残した（`m2-2b27551-M1-lines.log` 5,733 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、機器 B（public `71:2c`）。
 
 ## 結論
 
@@ -11,8 +11,8 @@
 | 1. 書き込み後の保存 | 回数は見込みどおり | 起動 1 回あたり：書き込み後は 1 回（`why=touch`、9.9 ms）、RST 後は 2 回（`touch` 35.1 ms、`touch` 10.4 ms）。どれも**入力が始まる前**だった（まだ一度も入力が来ていないので、すぐ書かれた） |
 | 2. RST の直後から IST を 30 秒 | **合格** | つながった直後の秒の `LAT` 最大 2.83 ms、その後 30 秒は 2.50 ms 以下。保存は 2 回とも入力が始まる前で、入力の間には無かった |
 | 3. `orbit alias 2 pedal` | 保存は出た | **入力が止まっているとき**：命令の 1 ms 後に `ledger saved (... why=set_alias)`（34.5 ms）。**IST を動かしている最中（直前の 1 秒で 84 件）**：命令の 2 ms 後に `ledger saved (1860 B, 9.5 ms, why=set_alias)`。入力の最中でも待たなかった。次の秒の `LAT` は最大 2.47 ms |
-| **4. `orbit forget 2` → `orbit pair`** | **合格（保存が重なる）** | `forgotten, dropping the link` の直後に `ledger saved (... why=forget, forced)`。続けて同じ理由の `why=forget`（13.8 ms）がもう 1 回出た。`orbit pair` で Cube Turner がすぐ新しいペアリング → `ledger: new device, port 2` → `held` → `hub_port=2`（**0.75 秒**）。ペダルが効いた（利用者が確認）。この間に保存が 3 回（`add`・`set_map`・`set_text`） |
-| **5. 3 分の使用** | **合格** | 00:59:17〜01:02:17。切断 0、2 台とも 175 秒すべて接続、`lost=0`。`LAT` 14,154 件、平均 0.84 ms、**最大 2.80 ms**、`unrelated=0`。入力は IST 164 秒、Cube Turner 4 秒。この間の保存は 0 回 |
+| **4. `orbit forget 2` → `orbit pair`** | **合格（保存が重なる）** | `forgotten, dropping the link` の直後に `ledger saved (... why=forget, forced)`。続けて同じ理由の `why=forget`（13.8 ms）がもう 1 回出た。`orbit pair` で 機器 B がすぐ新しいペアリング → `ledger: new device, port 2` → `held` → `hub_port=2`（**0.75 秒**）。ペダルが効いた（利用者が確認）。この間に保存が 3 回（`add`・`set_map`・`set_text`） |
+| **5. 3 分の使用** | **合格** | 00:59:17〜01:02:17。切断 0、2 台とも 175 秒すべて接続、`lost=0`。`LAT` 14,154 件、平均 0.84 ms、**最大 2.80 ms**、`unrelated=0`。入力は IST 164 秒、機器 B 4 秒。この間の保存は 0 回 |
 
 `WARNING`・`ledger save failed`・`no answer`・止まる不具合・BLE ホストのリセット・`broken 128-bit UUID`：すべて 0 回。`heap_min` の最小 87,212。A8：この版全体で `LAT` 28,461 件、平均 0.83 ms、**最大 14.70 ms**（下記 2）、`unrelated=0`。
 
@@ -70,12 +70,12 @@
 | 00:51:21、00:56:52 | IST を動かしながら `orbit alias 2`、`orbit alias 2 pedal` | 2 回目は入力の最中にすぐ保存 |
 | 00:58:06 | `orbit alias 2` | 別名を戻した |
 | 00:58:09 | `orbit forget 2` | 保存 2 回、その秒の `LAT` 6.30 ms |
-| 00:58:23 | `orbit pair` | Cube Turner が新しいペアリングでポート 2、保存 3 回、`LAT` 6.36 ms・14.70 ms |
+| 00:58:23 | `orbit pair` | 機器 B が新しいペアリングでポート 2、保存 3 回、`LAT` 6.36 ms・14.70 ms |
 | 00:59:17〜01:02:17 | **3 分の使用** | 切断 0、`lost=0`、`LAT` 最大 2.80 ms |
 
 ## 変わらないこと・未確認
 
 - MD600 の B5（自動引き継ぎ）・B6（組み直しの許可）は行っていない。
-- Cube Turner の LED の点滅の意味、スリープからの復帰、機器側で鍵を捨てたときの扱い。
+- 機器 B の LED の点滅の意味、スリープからの復帰、機器側で鍵を捨てたときの扱い。
 - 補正が働く機器（ゼロ埋めの 128 ビット UUID）はまだ無い。
 - A5（BIOS）は保留のまま。

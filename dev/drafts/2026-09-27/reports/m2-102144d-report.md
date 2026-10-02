@@ -1,6 +1,6 @@
 # M2 の報告：版 `102144d`（`orbit-m2-102144d-ble.bin`、2026-09-30）
 
-利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の手順（M2 の 2a：機器台帳・ペアリング管理・組み直しの許可・命令、PR #27）を行った。`.bin` の SHA-256 は一致（`6a7c5d39…465b`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は、ログ取りのスクリプトに「命令のファイルに書いた行を COM11 に送る」機能を足して送った（送った行はログに `# sent` として残る）。`M1` の行は全部ファイルに残した（`m2-102144d-M1-lines.log` 11,524 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。MD600 の「行う場合」（B5・B6）は行っていない。
+利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の手順（M2 の 2a：機器台帳・ペアリング管理・組み直しの許可・命令、PR #27）を行った。`.bin` の SHA-256 は一致（`6a7c5d39…465b`）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は、ログ取りのスクリプトに「命令のファイルに書いた行を COM11 に送る」機能を足して送った（送った行はログに `# sent` として残る）。`M1` の行は全部ファイルに残した（`m2-102144d-M1-lines.log` 11,524 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、機器 B（public `71:2c`）。MD600 の「行う場合」（B5・B6）は行っていない。
 
 ## 結論
 
@@ -10,16 +10,16 @@
 
 | 項目 | 結果 | 要点 |
 | --- | --- | --- |
-| **1. 書き込み → 台帳への移行** | **合格** | `ledger loaded boot=1 rows=0` → M1 のペアリング情報 2 件が `had no row, added as port 1`（IST）、`port 2`（Cube Turner）。2 台とも `(stored key)`、`DEV` の `port=` は IST 1、Cube Turner 2。情報を読んだあと `ledger: port 1 "IST TrackBall" kind=mouse`、`ledger: port 2 "TurnerPro" kind=keyboard+mouse` |
+| **1. 書き込み → 台帳への移行** | **合格** | `ledger loaded boot=1 rows=0` → M1 のペアリング情報 2 件が `had no row, added as port 1`（IST）、`port 2`（機器 B）。2 台とも `(stored key)`、`DEV` の `port=` は IST 1、機器 B 2。情報を読んだあと `ledger: port 1 "IST TrackBall" kind=mouse`、`ledger: port 2 "(略)" kind=keyboard+mouse` |
 | 1. 設定ツールでポート 1 に割り当て | **合格** | 利用者が設定ツールでポート 1 に割り当てを付けて保存 → IST で効いた（利用者が確認）→ 外して保存し直した。`config saved err=0x0` 2 回 |
 | **2. `orbit list`** | **合格** | `LDG` に名前・製造者・型番・`shown=` が入った。IST の製造者名は先頭の空白が削られて `PixArt Inc.` |
 | **3. `orbit alias`** | **合格** | `orbit alias 1 left` → `shown="left"`。`orbit alias 1` → `shown="IST TrackBall"` |
-| **4. RST 2 回** | **合格** | 2 回とも `ledger loaded`（`boot=2 rows=2`、`boot=3 rows=2`）、`port=` は IST 1・Cube Turner 2 のまま。2 台そろうまで 4.26 秒、4.34 秒 |
-| **5. `orbit forget 2`** | **合格** | `forget port 2` → `forgotten, dropping the link` → 切断。`ORB` は `devices=1/15`、`orbit list` は `1 of 15 ports used`。その後 39 秒、Cube Turner はつながらなかった |
-| **6. `orbit pair` → 新しいペアリング** | **合格** | Cube Turner は切られた後も広告を出していたので、電源を入れ直す前にペアリングまで済んだ（下記の流れ）。**`held` から `hub_port=2` まで 0.77 秒**。ペダルが効いた（利用者が確認） |
+| **4. RST 2 回** | **合格** | 2 回とも `ledger loaded`（`boot=2 rows=2`、`boot=3 rows=2`）、`port=` は IST 1・機器 B 2 のまま。2 台そろうまで 4.26 秒、4.34 秒 |
+| **5. `orbit forget 2`** | **合格** | `forget port 2` → `forgotten, dropping the link` → 切断。`ORB` は `devices=1/15`、`orbit list` は `1 of 15 ports used`。その後 39 秒、機器 B はつながらなかった |
+| **6. `orbit pair` → 新しいペアリング** | **合格** | 機器 B は切られた後も広告を出していたので、電源を入れ直す前にペアリングまで済んだ（下記の流れ）。**`held` から `hub_port=2` まで 0.77 秒**。ペダルが効いた（利用者が確認） |
 | **7. `orbit pair` → 待つ** | **合格** | 23:08:32 `pair_new_device` → **23:10:33 `pairing mode ended after 120 s without a new device`** → `stop_pairing bonds=2`。2 台つながっていたので `scan start` は出なかった。`ORB` は `pairing=119s` → `pairing=off` |
 | **8. `orbit approve`／短い押し込み** | **合格** | どちらも `approve: nothing is waiting for approval`。押し込みは `button released after 165 ms` |
-| **9. 5 分の使用** | **合格** | 23:28:30〜23:33:30。切断 0、2 台とも 291 秒すべて接続、`lost=0`。`ORB` 行は 291 回（毎秒）。`LAT` 3,160 件、平均 0.86 ms、**最大 2.32 ms**、`unrelated=0`。入力は IST 44 秒、Cube Turner 2 秒（操作は少なめ） |
+| **9. 5 分の使用** | **合格** | 23:28:30〜23:33:30。切断 0、2 台とも 291 秒すべて接続、`lost=0`。`ORB` 行は 291 回（毎秒）。`LAT` 3,160 件、平均 0.86 ms、**最大 2.32 ms**、`unrelated=0`。入力は IST 44 秒、機器 B 2 秒（操作は少なめ） |
 | 9. 命令を打っている間の `LAT` | **影響なし** | 20 秒ごとに `orbit list` を 14 回送った。送った直後の 1 秒間（入力があったのは 4 秒）は最大 2.04 ms、それ以外は最大 2.32 ms |
 
 `WARNING`・`ledger save failed`・`no answer`・`read failed`・止まる不具合・BLE ホストのリセット・`broken 128-bit UUID`：すべて 0 回。`dropping the link` は手順 5 の 1 回だけ。A8：この版全体で `LAT` 20,463 件、平均 0.81 ms、最大 9.40 ms（下記 1）、`unrelated=0`。
@@ -41,12 +41,12 @@ M1 LDG t=0.336 port=2 addr=..:71:2c public key=yes kind=device vid=0000 pid=0000
 
 ```
 M1 LDG port=1 addr=..:21:96 key=yes kind=mouse vid=056e pid=0184 hash=5c7471f4 last=1 name="IST TrackBall" manufacturer="PixArt Inc." model="MS 2822" alias="" shown="IST TrackBall"
-M1 LDG port=2 addr=..:71:2c key=yes kind=keyboard+mouse vid=0000 pid=0000 hash=b5fa2fcc last=1 name="TurnerPro" manufacturer="sincoaudio" model="ble device" alias="" shown="TurnerPro"
+M1 LDG port=2 addr=..:71:2c key=yes kind=keyboard+mouse vid=0000 pid=0000 hash=b5fa2fcc last=1 name="(略)" manufacturer="(略)" model="(略)" alias="" shown="(略)"
 M1 LDG 2 of 15 ports used
 M1 ORB t=514 devices=2/15 pairing=off full=0 ask=0:-:0s granted=0:0s duplicates=0
 ```
 
-### 手順 6 の流れ（Cube Turner）
+### 手順 6 の流れ（機器 B）
 
 | 時刻 | 行 |
 | --- | --- |
@@ -57,7 +57,7 @@ M1 ORB t=514 devices=2/15 pairing=off full=0 ask=0:-:0s granted=0:0s duplicates=
 | 23:07:35.755 | `report map 297 byte(s) hash=b5fa2fcc, held until the ledger row is settled` |
 | 23:07:36.343 | `subscribed 6 input report(s)` |
 | 23:07:36.372〜36.494 | `info` 5 行 |
-| 23:07:36.512 | `ledger: port 2 "TurnerPro" kind=keyboard+mouse` |
+| 23:07:36.512 | `ledger: port 2 "(略)" kind=keyboard+mouse` |
 | 23:07:36.513 | `report map 297 byte(s) hash=b5fa2fcc, hub_port=2` |
 
 `held` から `hub_port=2` まで 0.77 秒。`connecting` から入力できるまで 1.68 秒。
@@ -84,8 +84,8 @@ M1 ORB t=514 devices=2/15 pairing=off full=0 ask=0:-:0s granted=0:0s duplicates=
 
 ## そのほか
 
-- Cube Turner は、`orbit forget 2` で切られた後も広告を出し続けていたので、手順 6 では電源の入れ直しが要らなかった。
-- 手順 6 の新しいペアリングでは、Cube Turner の暗号化の知らせが普通に届いた（`found by polling` ではない）。
+- 機器 B は、`orbit forget 2` で切られた後も広告を出し続けていたので、手順 6 では電源の入れ直しが要らなかった。
+- 手順 6 の新しいペアリングでは、機器 B の暗号化の知らせが普通に届いた（`found by polling` ではない）。
 - 起動直後、IST のつながりが起動から 9.4 秒後だった（1 回目）。IST が眠っていたか、広告が遅れたと見ている。RST の 2 回は 4.26 秒、4.34 秒。
 - 短い押し込みは `button released after N ms` としてログに出るようになった。
 
@@ -97,8 +97,8 @@ M1 ORB t=514 devices=2/15 pairing=off full=0 ask=0:-:0s granted=0:0s duplicates=
 | 22:55:44、22:56:03 | 設定ツールでポート 1 に割り当てを保存 → 外して保存 | IST で効いた。2 回目の保存の秒に `LAT` 9.40 ms |
 | 22:56:37〜22:57:03 | `orbit list`、`orbit alias 1 left`、`orbit alias 1` | 合格 |
 | 22:57:49、23:00:18 | **RST 2 回** | `port=` 変わらず、4.26 秒・4.34 秒 |
-| 23:06:44 | `orbit forget 2` | Cube Turner が切れ、`devices=1/15` |
-| 23:07:34 | `orbit pair` | Cube Turner が新しいペアリング、ポート 2、0.77 秒 |
+| 23:06:44 | `orbit forget 2` | 機器 B が切れ、`devices=1/15` |
+| 23:07:34 | `orbit pair` | 機器 B が新しいペアリング、ポート 2、0.77 秒 |
 | 23:08:32〜23:10:33 | `orbit pair` → 待つ | 120 秒で終わった |
 | 23:10:56、23:27:08 | `orbit approve`、画面の短い押し込み | どちらも `nothing is waiting for approval` |
 | 23:28:30〜23:33:30 | **5 分の使用**（20 秒ごとに `orbit list`） | 切断 0、`LAT` 最大 2.32 ms |
@@ -106,8 +106,8 @@ M1 ORB t=514 devices=2/15 pairing=off full=0 ask=0:-:0s granted=0:0s duplicates=
 ## 変わらないこと・未確認
 
 - MD600 の「行う場合」（B5：同じ機器らしい古い行の自動引き継ぎ、B6：組み直しの許可）は行っていない。`approval wanted`・`looks like port` の行は一度も出ていない。
-- Cube Turner の LED の点滅の意味（PC でも点滅する）。
-- スリープからの復帰（Cube Turner は自動で眠らない）。
-- 機器側で鍵を捨てたときの扱い（Cube Turner でペアリングを消す方法が分からない）。
+- 機器 B の LED の点滅の意味（PC でも点滅する）。
+- スリープからの復帰（機器 B は自動で眠らない）。
+- 機器側で鍵を捨てたときの扱い（機器 B でペアリングを消す方法が分からない）。
 - 補正が働く機器（ゼロ埋めの 128 ビット UUID）はまだ無い。
 - A5（BIOS）は保留のまま。

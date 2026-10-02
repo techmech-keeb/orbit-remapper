@@ -1,22 +1,22 @@
 # M2 の報告：版 `4903ae1`（`orbit-m2-4903ae1-ble.bin`、2026-10-01）
 
-利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の確認（`302af13` の誤った `WARNING` の直し、PR #27）を行った。`.bin` の SHA-256 は `9cc7fd85626a153c5c032a89431f9d3926195e52a25cde6e9d2edacfb0346fd3`（リポジトリと PR には記録が無い。利用者がクラウドのセッションで確かめた）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は `102144d` と同じ方法で送り、IST を動かし続ける場面では、入力が 1 秒に 80 件以上届いているのを確かめてから送った。`M1` の行は全部ファイルに残した（`m2-4903ae1-M1-lines.log` 11,015 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、Cube Turner PRO（public `71:2c`）。
+利用者の PC（Windows 11、USB ハブ経由）と初代 M5Dial で、`m1-handoff.md` §0 の確認（`302af13` の誤った `WARNING` の直し、PR #27）を行った。`.bin` の SHA-256 は `9cc7fd85626a153c5c032a89431f9d3926195e52a25cde6e9d2edacfb0346fd3`（リポジトリと PR には記録が無い。利用者がクラウドのセッションで確かめた）。書き込みモードへは PC 側から 1200 bps で入れた。ログは COM11（115200 bps、DTR あり）で、起動の最初から取れた。命令は `102144d` と同じ方法で送り、IST を動かし続ける場面では、入力が 1 秒に 80 件以上届いているのを確かめてから送った。`M1` の行は全部ファイルに残した（`m2-4903ae1-M1-lines.log` 11,015 行。利用者の PC に保存、リポジトリには入れていない）。機器：IST Trackball（static `21:96`）、機器 B（public `71:2c`）。
 
 ## 結論
 
-**誤った `WARNING` は直った**（この版で 0 回）。Cube Turner をペアリングし直した 2 回とも、`encryption on (new pairing) pairing mode` で受け入れ、切られずにそのままポート 2 で動いた。保存の時機、探索中の入力も、`302af13` の直しが保たれている。
+**誤った `WARNING` は直った**（この版で 0 回）。機器 B をペアリングし直した 2 回とも、`encryption on (new pairing) pairing mode` で受け入れ、切られずにそのままポート 2 で動いた。保存の時機、探索中の入力も、`302af13` の直しが保たれている。
 
 **残るのは小さな 2 点**：新しいペアリングの探索の秒に IST の `LAT` が 5.46 ms・5.59 ms（5 ms を 0.5 ms ほど超える。下記 1）。「60 秒を超えて動かし続けても書かない」ことは、今回も確かめられなかった（下記 2）。
 
 | 項目 | 結果 | 要点 |
 | --- | --- | --- |
-| **1. 書き込み後の起動** | **合格** | 2 台とも `(stored key)`（Cube Turner は `, before the connect event`）。`at pairing complete` の行は無い。2 台そろうまで起動から 1.72 秒。保存は 1 回（`touch` 34.0 ms）で入力の前 |
-| **2. 動かしながら `orbit forget 2` → `orbit pair`（2 回）** | **合格（`LAT` は下記 1）** | 2 回とも：`forget` の保存は直後に 1 回（`forced`）。`scan start (pairing, listening 10/100 ms)`。Cube Turner は `device started security itself` → **`encryption on (new pairing) pairing mode`** → `ledger: new device, port 2` → `held` → `hub_port=2`。**`WARNING` 0 回、切断なし** |
-| 2. `pair_new_device` から `hub_port=2` まで | 6.92 秒、8.57 秒 | Cube Turner が見つかるまで 4.9 秒・6.5 秒（探索の割合を下げたため）。見つかってから `hub_port=2` まで 2.0 秒・2.1 秒 |
+| **1. 書き込み後の起動** | **合格** | 2 台とも `(stored key)`（機器 B は `, before the connect event`）。`at pairing complete` の行は無い。2 台そろうまで起動から 1.72 秒。保存は 1 回（`touch` 34.0 ms）で入力の前 |
+| **2. 動かしながら `orbit forget 2` → `orbit pair`（2 回）** | **合格（`LAT` は下記 1）** | 2 回とも：`forget` の保存は直後に 1 回（`forced`）。`scan start (pairing, listening 10/100 ms)`。機器 B は `device started security itself` → **`encryption on (new pairing) pairing mode`** → `ledger: new device, port 2` → `held` → `hub_port=2`。**`WARNING` 0 回、切断なし** |
+| 2. `pair_new_device` から `hub_port=2` まで | 6.92 秒、8.57 秒 | 機器 B が見つかるまで 4.9 秒・6.5 秒（探索の割合を下げたため）。見つかってから `hub_port=2` まで 2.0 秒・2.1 秒 |
 | 2. 探索中の IST の入力 | **合格** | 1 回目 119〜134、2 回目 125〜133 件/秒 |
 | 2. 保存のまとまり | **合格** | 2 回とも、ペアリングの保存は手を止めた後の 1 回（`why=add`）。2 回目は動かし続けた 40 秒の間は出ず、手が止まった後に出た |
 | **3. 動かしながら `orbit alias 2 pedal`** | **待つ動きは合格、60 秒超は未確認** | 21:10:06 に命令 → 保存は 21 秒後の 21:10:27（`33.4 ms, why=set_alias`）。命令後 9 秒は 72〜129 件/秒、その後 11 秒は 2〜10 件/秒（途切れは最大 952 ms）で、1 秒以上途切れた後に書いた。その間の `LAT` は最大 2.37 ms、3 ms 超 0、`unrelated=0` |
-| **4. 3 分の使用** | **合格** | 21:11:11〜21:14:11。切断 0、2 台とも 174 秒すべて接続、`lost=0`。`LAT` 11,167 件、平均 0.87 ms、**最大 2.76 ms**（3 ms 超の秒 0）、`unrelated=0`。入力は IST 129 秒、Cube Turner 6 秒。この間の保存は 0 回 |
+| **4. 3 分の使用** | **合格** | 21:11:11〜21:14:11。切断 0、2 台とも 174 秒すべて接続、`lost=0`。`LAT` 11,167 件、平均 0.87 ms、**最大 2.76 ms**（3 ms 超の秒 0）、`unrelated=0`。入力は IST 129 秒、機器 B 6 秒。この間の保存は 0 回 |
 
 `WARNING`・`ledger save failed`・`no answer`・止まる不具合・BLE ホストのリセット・`broken 128-bit UUID`・`nothing subscribed`：すべて 0 回。`found by polling`・`at pairing complete`：0 回。`dropping the link` は `forgotten` の 2 回だけ。`heap_min` の最小 87,640。A8：この版全体で `LAT` 32,499 件、平均 0.87 ms、最大 8.76 ms（`forced` の秒）、`unrelated=0`。
 
@@ -25,10 +25,10 @@
 | 秒 | `LAT` 最大 | そのとき |
 | --- | --- | --- |
 | 20:43:43 | 8.76 ms | `forget, forced` の保存（9.6 ms） |
-| 20:43:50 | 4.43 ms | 1 回目：Cube Turner が新しいペアリング（`encryption on (new pairing)`） |
-| 20:43:51 | 5.46 ms | 1 回目：Cube Turner の探索・Report Map の読み出し |
+| 20:43:50 | 4.43 ms | 1 回目：機器 B が新しいペアリング（`encryption on (new pairing)`） |
+| 20:43:51 | 5.46 ms | 1 回目：機器 B の探索・Report Map の読み出し |
 | 21:07:33 | 4.78 ms | `forget, forced` の保存（9.0 ms） |
-| 21:07:43 | 5.59 ms | 2 回目：Cube Turner の新しいペアリング・探索 |
+| 21:07:43 | 5.59 ms | 2 回目：機器 B の新しいペアリング・探索 |
 
 - `forced` の秒を除くと、3 ms を超えたのは新しいペアリングの探索の秒だけ（2 回で 3 秒）。
 
@@ -54,7 +54,7 @@
 
 ### 1. 新しいペアリングの探索の秒に、IST の `LAT` が 5 ms をわずかに超える
 
-- 2 回とも、Cube Turner が新しいペアリングをして探索する秒に、IST の `LAT` が 4.43〜5.59 ms になった。`302af13` では `hub_port=2` の秒に 4.13 ms・3.58 ms だった。
+- 2 回とも、機器 B が新しいペアリングをして探索する秒に、IST の `LAT` が 4.43〜5.59 ms になった。`302af13` では `hub_port=2` の秒に 4.13 ms・3.58 ms だった。
 - 起きるのは、新しい機器をペアリングするときの 1〜2 秒だけ。ふつうの使用（3 分）では 3 ms を超えた秒は 0。
 - 基準（5 ms 以内）を 0.5 ms ほど超えている。ペアリングのときだけと割り切るなら、基準に「新しいペアリングの探索の 2 秒を除く」を足す手もある。直すなら、探索（GATT の発見と Report Map の読み出し）か、記述子の解釈が主ループに与える負荷を見る（推測）。
 
@@ -79,6 +79,6 @@
 
 - 「60 秒を超えて動かし続けても書かない」こと（上記 2）。
 - MD600 の B5（自動引き継ぎ）・B6（組み直しの許可）は行っていない。
-- Cube Turner の LED の点滅の意味、スリープからの復帰、機器側で鍵を捨てたときの扱い。
+- 機器 B の LED の点滅の意味、スリープからの復帰、機器側で鍵を捨てたときの扱い。
 - 補正が働く機器（ゼロ埋めの 128 ビット UUID）はまだ無い。
 - A5（BIOS）は保留のまま。

@@ -12,18 +12,18 @@ M1 を作っているクラウドのセッションから、利用者の PC で�
 
 - **M2 の 2a は完了**：`4903ae1` が合格し、PR #27（マージ `b587495`） を利用者がマージした（`b587495`）。画面（M3）は PR #34（マージ `1bff908`）（ブランチ `claude/m3-screen`、`main` 向け）。**画面の試験手順は [m3-screen.md](../2026-10-01/m3-screen.md) §3・§4** に書く。以後、版は「M2 ＋画面」の 1 本で渡す（利用者の決定）。
 - 進め方（利用者と合意）：画面の 2 日目 → その版で 2a の残り（MD600 があれば B5・B6）→ 2b → 画面にレイヤー表示 → 2c → 画面に設定セット表示 → 設定ツール。
-- **注意**：ペアリング情報の上限が 4 → 15 になったので `sdkconfig` が変わる。書き込みは今までどおり 1 ファイル（NVS は消えない）。M1 のペアリング情報 2 件は、最初の起動で台帳に足される（`ledger: bond ... had no row, added as port N`。IST が 1、Cube Turner が 2 のはず＝M1 の `hub_port` と同じ）。
+- **注意**：ペアリング情報の上限が 4 → 15 になったので `sdkconfig` が変わる。書き込みは今までどおり 1 ファイル（NVS は消えない）。M1 のペアリング情報 2 件は、最初の起動で台帳に足される（`ledger: bond ... had no row, added as port N`。IST が 1、機器 B が 2 のはず＝M1 の `hub_port` と同じ）。
 - **命令の打ち方**：ログを取っている COM ポートに 1 行ずつ送る（改行で確定）。返事は `M1 CMD` と `M1 LDG` の行。
 - **行う場合（MD600 があるとき。B5・B6 の本番）**：
   - B5：Pair new device で MD600 をペアリング（ポート 3）→ `orbit alias 3 md600` → MD600 をリセット（アドレスが変わる）→ Pair new device で MD600 をもう一度ペアリング → `ledger: looks like port 3 (...), taking over its port` が出て、ポート 3・別名 `md600` のまま動くこと。`orbit list` で行が 3 つ（増えていない）。
   - B6：MD600 側で Orbit のペアリングを消す（アドレスが変わらない手順があれば）→ MD600 の電源を入れ直す → `approval wanted: device has no key for us; press the button within 60 s` → 画面を短く押す → `approved: port 3 ... may pair again` → MD600 が新しい鍵でつながり `new key accepted (approved by the user)`。もう一度同じことをして、今度は押さずに 60 秒待つ → `approval for port 3 not given within 60 s (1 of 3)`。
 - **見てほしいこと**：台帳の保存（`ledger save failed` が出ないこと）、`heap_min`（台帳で約 4 KB 増える見込み）、命令を打っている間に `LAT` が増えないか。
-- 未確認のまま：Cube Turner の LED の意味、スリープからの復帰（Cube Turner は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
+- 未確認のまま：機器 B の LED の意味、スリープからの復帰（機器 B は眠らない）、機器側で鍵を捨てたとき、A5（BIOS）、MD600・meteorite40 での `a0d8f9e` 以降の回帰（下の手順）。
 - 報告の形は §7。`M1` の行は全部ファイルに残す。報告のファイルは `dev/drafts/2026-09-27/reports/` に置いてよい。クラウドとローカルのセッションは直接はやり取りできない。
 
 ### MD600・meteorite40 の回帰確認（行う場合）
 
-1. Pair new device で MD600 と meteorite40 をペアリング（IST と Cube Turner はそのまま。ボンドは 4 件までなので、超えるなら Forget all devices から）。
+1. Pair new device で MD600 と meteorite40 をペアリング（IST と 機器 B はそのまま。ボンドは 4 件までなので、超えるなら Forget all devices から）。
 2. M5Dial の RST を 2 回。2 台が `(stored key)` でつながり、5 秒以内にそろうこと。
 3. 機器の電源の入れ直しを各 1 回。0.5〜1 秒でつながり直すこと。
 4. 5 分の使用で切断 0、`LAT` 最大 3 ms 以内、`WARNING` 0 回。
