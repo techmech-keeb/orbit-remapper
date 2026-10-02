@@ -3,8 +3,8 @@
 // Layout on the 240 x 240 round panel: an outer ring whose colour is the
 // state at a glance (green: everything bonded is connected, blue: waiting,
 // yellow: pairing, red: a question for the user), two device cards in the
-// middle, one line of state below them, and the small numbers (USB, LAT,
-// heap) at the bottom. The dial moves the highlight between the cards and
+// middle (name and battery level, then the link), one line of state below
+// them, and the small numbers (USB, LAT, heap) at the bottom. The dial moves the highlight between the cards and
 // the menu items; the button opens the menu, confirms, or answers an
 // approval question.
 //
@@ -45,6 +45,12 @@
 #define C_RED      0xff5252
 #define C_GREY     0x3a4450
 
+#define NAME_W 136 // card name width without a battery level
+
+// Battery colours (battery.md §2): normal from 30 %, yellow 11..29 %, red at 10 % or less.
+#define BAT_YELLOW_BELOW 30
+#define BAT_RED_AT       10
+
 // Settings in NVS (namespace "orbit")
 #define NS "orbit"
 #define KEY_ROTATION "ui_rot"   // quarter turns, 0..3
@@ -65,6 +71,7 @@ static lv_obj_t* card[ORBIT_MAX_DEVS];
 static lv_obj_t* card_name[ORBIT_MAX_DEVS];
 static lv_obj_t* card_line[ORBIT_MAX_DEVS];
 static lv_obj_t* card_dot[ORBIT_MAX_DEVS];
+static lv_obj_t* card_bat[ORBIT_MAX_DEVS];
 static lv_obj_t* state_line;
 static lv_obj_t* footer;
 static lv_obj_t* menu;
@@ -97,6 +104,8 @@ static struct {
     char name[ORBIT_MAX_DEVS][32];
     char line[ORBIT_MAX_DEVS][48];
     uint32_t dot[ORBIT_MAX_DEVS];
+    char bat[ORBIT_MAX_DEVS][16];
+    uint32_t bat_color[ORBIT_MAX_DEVS];
     int selected;
 } shown;
 
@@ -165,9 +174,13 @@ static void build(void) {
         shown.dot[i] = C_GREY;
         lv_obj_align(card_dot[i], LV_ALIGN_LEFT_MID, 0, 0);
         card_name[i] = make_label(card[i], &lv_font_montserrat_16, C_TEXT);
-        lv_obj_set_width(card_name[i], 136);
+        lv_obj_set_width(card_name[i], NAME_W);
         lv_label_set_long_mode(card_name[i], LV_LABEL_LONG_MODE_DOTS);
         lv_obj_align(card_name[i], LV_ALIGN_TOP_LEFT, 16, -2);
+        // Right of the name, on its line; the name gives up the width it takes.
+        card_bat[i] = make_label(card[i], &lv_font_montserrat_12, C_TEXT);
+        lv_obj_align(card_bat[i], LV_ALIGN_TOP_RIGHT, 0, 1);
+        shown.bat_color[i] = C_TEXT;
         card_line[i] = make_label(card[i], &lv_font_montserrat_12, C_DIM);
         lv_obj_align(card_line[i], LV_ALIGN_BOTTOM_LEFT, 16, 2);
     }
@@ -556,6 +569,37 @@ static uint32_t ring_color(const orbit_ui_state_t* s, char* buf, int len) {
     return C_GREEN;
 }
 
+// The battery part of a card: symbol and %, or nothing when the device
+// has no Battery Service or its level is not read yet.
+static void show_battery(int i, uint8_t level) {
+    char text[16] = "";
+    uint32_t color = C_TEXT;
+    if (level != ORBIT_BATTERY_UNKNOWN) {
+        const char* sym = level > 80   ? LV_SYMBOL_BATTERY_FULL
+                          : level > 55 ? LV_SYMBOL_BATTERY_3
+                          : level > 30 ? LV_SYMBOL_BATTERY_2
+                          : level > 10 ? LV_SYMBOL_BATTERY_1
+                                       : LV_SYMBOL_BATTERY_EMPTY;
+        snprintf(text, sizeof(text), "%s %u%%", sym, level);
+        color = level <= BAT_RED_AT ? C_RED : level < BAT_YELLOW_BELOW ? C_YELLOW : C_TEXT;
+    }
+    if (strncmp(shown.bat[i], text, sizeof(shown.bat[i])) != 0) {
+        snprintf(shown.bat[i], sizeof(shown.bat[i]), "%s", text);
+        lv_label_set_text(card_bat[i], text);
+        int w = 0;
+        if (text[0] != '\0') {
+            lv_point_t size;
+            lv_text_get_size(&size, text, &lv_font_montserrat_12, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            w = size.x + 6;
+        }
+        lv_obj_set_width(card_name[i], NAME_W - w);
+    }
+    if (color != shown.bat_color[i]) {
+        lv_obj_set_style_text_color(card_bat[i], lv_color_hex(color), 0);
+        shown.bat_color[i] = color;
+    }
+}
+
 void orbit_ui_update(const orbit_ui_state_t* s) {
     if (disp == NULL || !lvgl_port_lock(50)) {
         return; // never hold up the status task
@@ -573,6 +617,13 @@ void orbit_ui_update(const orbit_ui_state_t* s) {
         shown.ring_color = color;
     }
     uint32_t text_color = color == C_GREY ? C_DIM : color;
+    // A battery running low takes the state line for a minute, unless
+    // something there needs the user. The ring keeps its colour, and a
+    // dark screen stays dark (battery.md §2).
+    if (s->low_port != 0 && !s->approval.wanted && !s->full && !s->pairing && s->approval.granted_port == 0) {
+        snprintf(buf, sizeof(buf), "Port %d battery low (%d%%)", s->low_port, s->low_level);
+        text_color = C_RED;
+    }
     if (text_color != shown.state_color) {
         lv_obj_set_style_text_color(state_line, lv_color_hex(text_color), 0);
         shown.state_color = text_color;
@@ -587,6 +638,7 @@ void orbit_ui_update(const orbit_ui_state_t* s) {
         const orbit_ui_dev_t* d = &s->dev[i];
         uint32_t dot;
         char line[48];
+        show_battery(i, d->connected ? d->battery : ORBIT_BATTERY_UNKNOWN);
         if (!d->connected) {
             set_text_if_changed(card_name[i], shown.name[i], sizeof(shown.name[i]), "--");
             line[0] = '\0';

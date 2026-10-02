@@ -23,6 +23,7 @@ typedef struct {
     int subscribed;
     unsigned reports;   // in the last second
     unsigned disconnects;
+    uint8_t battery;    // lowest Battery Level in %, or ORBIT_BATTERY_UNKNOWN
 } orbit_ui_dev_t;
 
 typedef struct {
@@ -33,6 +34,7 @@ typedef struct {
     bool full;
     bool duplicates;
     orbit_approval_t approval;
+    int low_port, low_level;  // battery-low notice; low_port 0 when none
     const char* usb;          // "none", "suspended", "mounted"
     bool boot_protocol;
     double lat_avg_ms, lat_max_ms; // 0 when nothing was sent
