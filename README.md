@@ -27,6 +27,8 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 - [リマップの設定](docs/configuration.md)：本家の Web 設定ツールでの設定、機器ごとに分ける方法
 - [困ったとき](docs/troubleshooting.md)
 
+**M5Dial の入手先**：動作を確かめたのは初代 M5Dial（M5StampS3 搭載）です。初代は手に入りにくくなっており、いま売られているのは後継の M5Stack Dial v1.1（StampS3A 搭載、型番 K130-V11）です。購入先の例：[スイッチサイエンス](https://www.switch-science.com/products/10302)。**v1.1 では、Orbit の動作も技適（日本の電波法の認証）も、まだ確かめていません。**
+
 ファームウェアは [Releases](https://github.com/techmech-keeb/orbit-remapper/releases) から取れます（`Orbit_Remapper_firmware_v<版>_M5Dial.bin`）。変更の履歴は [CHANGELOG.md](CHANGELOG.md) にあります。自分でビルドすることもできます（[firmware/orbit/README.md](firmware/orbit/README.md#2-ビルドと書き込み)）。BIOS の画面で使えるか、PC をスリープから起こせるかは、まだ確かめていません。
 
 ## 開発に加わる人へ
