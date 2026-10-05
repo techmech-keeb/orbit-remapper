@@ -1,0 +1,4 @@
+# Upstream HID Remapper, imported as a subtree (firmware/hid-remapper/UPSTREAM.md).
+# Left out of GitHub's language statistics so that the repository shows
+# Orbit's own code; its web config tool alone made it read as JavaScript.
+firmware/hid-remapper/** linguist-vendored
