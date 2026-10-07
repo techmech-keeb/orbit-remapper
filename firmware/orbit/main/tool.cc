@@ -34,7 +34,8 @@ enum : uint8_t { TEXT_NAME, TEXT_MANUFACTURER, TEXT_MODEL, TEXT_ALIAS, TEXT_SHOW
 
 #define REPORT_LEN 32
 #define PAYLOAD_LEN 28
-#define PROTOCOL_VERSION 1
+// 2: GET_STATE ends with the battery levels (bytes that were zero in 1).
+#define PROTOCOL_VERSION 2
 
 struct __attribute__((packed)) state_reply_t {
     uint8_t protocol;        // PROTOCOL_VERSION
@@ -48,7 +49,9 @@ struct __attribute__((packed)) state_reply_t {
     uint8_t granted_remaining_s;
     uint8_t duplicates;      // several rows look like one device
     uint8_t connected[ORBIT_MAX_DEVS]; // port per slot, 0 when empty
+    uint8_t battery[ORBIT_MAX_DEVS];   // lowest Battery Level per slot in %, 255 when unknown or empty
 };
+static_assert(sizeof(state_reply_t) <= PAYLOAD_LEN, "GET_STATE reply must fit the payload");
 
 struct __attribute__((packed)) row_reply_t {
     uint8_t port;
@@ -150,6 +153,7 @@ uint16_t orbit_tool_get_report(uint8_t* buffer, uint16_t reqlen) {
         r->duplicates = orbit_ble_duplicates();
         for (int i = 0; i < ORBIT_MAX_DEVS; i++) {
             r->connected[i] = orbit_ble_slot_port(i);
+            r->battery[i] = orbit_ble_slot_battery(i);
         }
         break;
     }

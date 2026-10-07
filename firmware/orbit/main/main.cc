@@ -207,6 +207,7 @@ static void status_task(void* arg) {
             d->subscribed = st.subscribed;
             d->reports = st.reports;
             d->disconnects = st.disconnects;
+            d->battery = st.battery;
             if (st.connected) {
                 ble_gap_conn_desc desc = {};
                 ble_gap_conn_find(st.conn_handle, &desc);
@@ -227,6 +228,11 @@ static void status_task(void* arg) {
         ui.full = orbit_ble_bonds_full();
         ui.duplicates = orbit_ble_duplicates();
         orbit_ble_approval(&ui.approval);
+        int low_port, low_level;
+        if (orbit_ble_battery_notice(&low_port, &low_level)) {
+            ui.low_port = low_port;
+            ui.low_level = low_level;
+        }
         ui.usb = !mounted ? "none" : susp ? "suspended" : "mounted";
         ui.boot_protocol = boot_protocol_keyboard;
         ui.heap_free = heap_free;
