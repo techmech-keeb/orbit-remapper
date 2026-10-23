@@ -1,6 +1,6 @@
 # Orbit Remapper の使い方
 
-Orbit Remapper を使う人向けの説明です。作り方や開発の記録は [dev/](../dev/README.md) にあります。
+Orbit Remapper を使う人向けの説明です。ビルド、リリース、公開試験用プログラムは [開発者向けガイド](../dev/README.md) にあります。
 
 | 文書 | 内容 |
 | --- | --- |
