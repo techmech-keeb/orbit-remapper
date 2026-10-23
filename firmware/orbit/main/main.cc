@@ -36,6 +36,7 @@
 #include "storage.h"
 #include "ledger.h"
 #include "commands.h"
+#include "typist.h"
 #include "ui.h"
 
 #define PIN_POWER_HOLD 46 // keeps the M5Dial on when running from battery
@@ -348,6 +349,7 @@ static void main_loop(void* arg) {
         if (monitor_enabled && tud_hid_n_ready(1)) {
             send_monitor_report(do_send_report);
         }
+        orbit_typist_poll(); // "Open config page": a press or a release when due
         if (our_descriptor->main_loop_task != nullptr) {
             our_descriptor->main_loop_task();
         }

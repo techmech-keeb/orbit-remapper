@@ -8,6 +8,7 @@ Orbit Remapper のファームウェアの変更履歴です。形式は [Keep a
 
 - 機器の電池の残量（Bluetooth の Battery Service）を読み、画面のカードに電池の印と % で出す。30% 未満は黄、10% 以下は赤。10% 以下になったときは状態の行で 1 回知らせる。通知を送らない機器は 10 分ごとに読み直す。値はメモリだけに置き、機器が切れたら消す。
 - ログの `orbit list` に `battery=`、設定ツール向けの `GET_STATE` に枠ごとの残量を足した。
+- 画面のメニューに「Open config page」を足した。PC の Chrome でアドレス欄をクリックしてから中央を押すと、Orbit がキーボードとして本家の Web 設定ツールのアドレス（`www.remapper.org/config/`）と Enter を打つ。US 配列と日本語配列で同じキーになる文字だけを使う。ログの命令 `orbit openconfig` でも打てる。
 
 ### 変更
 

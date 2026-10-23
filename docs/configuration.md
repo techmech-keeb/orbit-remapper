@@ -7,6 +7,8 @@ Orbit のリマップは、本家 HID Remapper のコアがそのまま行いま
 1. Orbit を PC につなぎます。
 2. Chrome か Chrome 系のブラウザで https://www.remapper.org/config/ を開きます（WebHID を使うため、ほかのブラウザでは動きません）。
 3. 「Open device」を押し、「HID Remapper Bluetooth」を選びます。
+
+アドレスは Orbit に打たせることもできます。Chrome で新しいタブを開いてアドレス欄をクリックし、Orbit のメニューで「Open config page」を選んで、画面の手順どおりに中央を押します。Orbit はキーボードとして `www.remapper.org/config/` と Enter を打ちます（`https://` はブラウザが補います）。キーの位置が同じ US 配列と日本語配列で確かめています。ほかの配列（フランス語など）では文字が変わることがあります。
 4. 設定を変えたら、「Save to device」で本体に保存します。保存した設定は、電源を切っても残ります。
 
 設定ツールの使い方は、本家の説明書 https://www.remapper.org/manual/ にあります。式（Expressions）の書き方は、本家の [EXPRESSIONS.md](../firmware/hid-remapper/EXPRESSIONS.md) にあります。

@@ -23,6 +23,7 @@
 #include "display.h"
 #include "ledger.h"
 #include "log.h"
+#include "typist.h"
 #include "ui.h"
 
 #define PIN_ENC_A 40 // M5Dial rotary encoder (docs.m5stack.com/en/core/M5Dial)
@@ -82,6 +83,8 @@ static lv_obj_t* footer;
 static lv_obj_t* menu;
 static lv_obj_t* menu_item[8];
 static lv_obj_t* notice; // full-screen message
+static lv_obj_t* confirm; // "Open config page": the steps, then "Typing..."
+static lv_obj_t* confirm_text[5];
 
 static orbit_ui_state_t last; // latest snapshot (LVGL lock held while used)
 static int selected = -1;     // card index, or -1 for none
@@ -90,12 +93,17 @@ static int menu_sel;
 static int menu_count;
 static int confirm_forget;    // port awaiting a second press, 0: none
 static int64_t menu_opened_us;
+// "Open config page": 0 closed, 1 waiting for the press, 2 typing, 3 not available.
+static int confirm_open;
+static int64_t confirm_since_us; // state 1: closes after CONFIRM_WAIT_US without a press
+static int64_t confirm_until_us; // states 2 and 3: closes at this time
+#define CONFIRM_WAIT_US (20 * 1000000)
 static uint8_t rotation;      // quarter turns
 static uint8_t screen_off;    // index into screen_off_s[]
 static int64_t last_activity_us;
 static bool screen_dark;
 
-typedef enum { M_PAIR, M_STOP, M_APPROVE, M_FORGET, M_ROTATE, M_OFF, M_CLOSE } menu_kind_t;
+typedef enum { M_PAIR, M_STOP, M_APPROVE, M_FORGET, M_CONFIG, M_ROTATE, M_OFF, M_CLOSE } menu_kind_t;
 static menu_kind_t menu_kind[8];
 static int menu_port[8];
 
@@ -229,6 +237,26 @@ static void build(void) {
     }
     lv_obj_set_hidden(menu, true);
 
+    // Same round panel as the menu: a title, three lines and a hint.
+    confirm = lv_obj_create(scr);
+    lv_obj_set_size(confirm, 200, 200);
+    lv_obj_center(confirm);
+    lv_obj_set_style_radius(confirm, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(confirm, lv_color_hex(C_CARD), 0);
+    lv_obj_set_style_border_color(confirm, lv_color_hex(C_BLUE), 0);
+    lv_obj_set_style_border_width(confirm, 2, 0);
+    lv_obj_set_style_pad_all(confirm, 10, 0);
+    lv_obj_set_scrollable(confirm, false);
+    for (int i = 0; i < 5; i++) {
+        const lv_font_t* font = i == 0 ? &lv_font_montserrat_16 : i == 4 ? &lv_font_montserrat_12 : &lv_font_montserrat_14;
+        confirm_text[i] = make_label(confirm, font, i == 0 ? C_BLUE : i == 4 ? C_DIM : C_TEXT);
+        lv_obj_set_size(confirm_text[i], 170, i == 0 ? 20 : 18);
+        lv_obj_set_style_text_align(confirm_text[i], LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(confirm_text[i], LV_LABEL_LONG_MODE_DOTS);
+        lv_obj_align(confirm_text[i], LV_ALIGN_CENTER, 0, i == 0 ? -58 : i == 4 ? 62 : -22 + (i - 1) * 24);
+    }
+    lv_obj_set_hidden(confirm, true);
+
     notice = lv_obj_create(scr);
     lv_obj_set_size(notice, W, H);
     lv_obj_center(notice);
@@ -290,6 +318,7 @@ static void render_menu(void) {
         menu_port[menu_count] = last.dev[selected].port;
         menu_count++;
     }
+    menu_kind[menu_count++] = M_CONFIG;
     menu_kind[menu_count++] = M_ROTATE;
     menu_kind[menu_count++] = M_OFF;
     menu_kind[menu_count++] = M_CLOSE;
@@ -317,6 +346,9 @@ static void render_menu(void) {
             snprintf(text, sizeof(text), confirm_forget == menu_port[i] ? LV_SYMBOL_WARNING "  Really forget?"
                                                                         : LV_SYMBOL_TRASH "  Forget port %d",
                      menu_port[i]);
+            break;
+        case M_CONFIG:
+            snprintf(text, sizeof(text), LV_SYMBOL_KEYBOARD "  Open config page");
             break;
         case M_ROTATE:
             snprintf(text, sizeof(text), LV_SYMBOL_REFRESH "  Rotate: %d deg", rotation * 90);
@@ -349,6 +381,41 @@ static void menu_close(void) {
     show_main(true);
 }
 
+// ---- "Open config page" ----
+//
+// Orbit types the config tool's address on the PC as the keyboard it already
+// is (typist.cc), so the user only has to put the cursor in the address bar.
+// A confirmation screen first, and only the press types: a device that types
+// by itself must never do so unasked.
+
+static void confirm_set(const char* title, const char* l1, const char* l2, const char* l3, const char* hint) {
+    const char* t[5] = { title, l1, l2, l3, hint };
+    for (int i = 0; i < 5; i++) {
+        lv_label_set_text(confirm_text[i], t[i]);
+    }
+}
+
+static void confirm_close(void) {
+    confirm_open = 0;
+    lv_obj_set_hidden(confirm, true);
+    show_main(true);
+}
+
+static void confirm_press(int64_t now) {
+    if (!orbit_typist_available()) {
+        olog("M1 EVT t=%.3f screen: open config page, but the USB descriptor has no keyboard\n", now_s());
+        confirm_set("No keyboard", "This USB mode has no", "keyboard to type with.", "", "");
+        confirm_open = 3;
+        confirm_until_us = now + 3 * 1000000;
+        return;
+    }
+    olog("M1 EVT t=%.3f screen: open config page, typing\n", now_s());
+    orbit_typist_request_config_url();
+    confirm_set("Typing...", "www.remapper.org", "/config/", "", "");
+    confirm_open = 2;
+    confirm_until_us = now + 2 * 1000000;
+}
+
 static void menu_act(void) {
     switch (menu_kind[menu_sel]) {
     case M_PAIR:
@@ -372,6 +439,17 @@ static void menu_act(void) {
         olog("M1 EVT t=%.3f screen: forget port %d\n", now_s(), menu_port[menu_sel]);
         orbit_ble_forget(menu_port[menu_sel]);
         break;
+    case M_CONFIG:
+        olog("M1 EVT t=%.3f screen: open config page, waiting for the press\n", now_s());
+        menu_open = 0;
+        confirm_forget = 0;
+        lv_obj_set_hidden(menu, true);
+        confirm_set("Open config page", "In Chrome on the PC,", "click the address bar,", "then press the dial.",
+                    "Turn the dial to cancel");
+        confirm_open = 1;
+        confirm_since_us = esp_timer_get_time();
+        lv_obj_set_hidden(confirm, false);
+        return; // the main screen stays hidden behind it
     case M_ROTATE:
         rotation = (rotation + 1) % 4;
         settings_save();
@@ -413,6 +491,23 @@ static void poll_input(lv_timer_t* t) {
             return;
         }
     }
+    if (confirm_open) {
+        encoder_last = count; // the dial only cancels here
+        if (confirm_open == 1) {
+            if (steps != 0) {
+                olog("M1 EVT t=%.3f screen: open config page cancelled\n", now_s());
+                confirm_close();
+            } else if (pressed) {
+                confirm_press(now);
+            } else if (now - confirm_since_us > CONFIRM_WAIT_US) {
+                olog("M1 EVT t=%.3f screen: open config page timed out\n", now_s());
+                confirm_close();
+            }
+        } else if (now >= confirm_until_us && (confirm_open != 2 || !orbit_typist_busy())) {
+            confirm_close();
+        }
+        return;
+    }
     if (steps != 0) {
         encoder_last += steps * ENC_STEPS_PER_DETENT;
         if (menu_open) {
@@ -451,7 +546,7 @@ static void poll_input(lv_timer_t* t) {
             lv_obj_set_hidden(menu, false);
         }
     }
-    if (!screen_dark && screen_off_s[screen_off] != 0 && !menu_open && !last.approval.wanted &&
+    if (!screen_dark && screen_off_s[screen_off] != 0 && !menu_open && !confirm_open && !last.approval.wanted &&
         now - last_activity_us > (int64_t) screen_off_s[screen_off] * 1000000) {
         screen_dark = true;
         display_backlight(false);

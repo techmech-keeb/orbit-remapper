@@ -35,6 +35,7 @@
 | Pair new device / Stop pairing | ペアリング待ちを始める / やめる |
 | Allow port N | 登録済みの機器が組み直しを求めているとき、許可する（下の「組み直しの許可」） |
 | Forget port N | 選んだカードの機器を消す。もう一度押して確定（`Really forget?`）。カードを選んでいるときだけ出る |
+| Open config page | 本家の Web 設定ツールのアドレスを、Orbit が PC に打ち込む。選ぶと手順が出るので、PC の Chrome でアドレス欄をクリックしてから、中央を押す。回すとやめる（[リマップの設定](configuration.md#設定ツールを開く)） |
 | Rotate | 画面を 90 度ずつ回す |
 | Screen off | 画面を消すまでの時間（never、30 s、2 min、10 min） |
 | Close | メニューを閉じる。何もしなければ 15 秒で閉じる |

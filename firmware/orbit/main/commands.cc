@@ -14,6 +14,7 @@
 #include "ledger.h"
 #include "log.h"
 #include "orbit.h"
+#include "typist.h"
 
 static char line[96];
 static int line_len;
@@ -49,7 +50,7 @@ static void run(char* cmd) {
     verb = strtok(NULL, " ");
     if (verb == NULL || strcmp(verb, "help") == 0) {
         olog("M1 CMD commands: orbit list | forget <port> | move <new port> <old port> | alias <port> <text> | "
-             "pair | stop | approve | battery <port> <percent>\n");
+             "pair | stop | approve | battery <port> <percent> | openconfig\n");
         return;
     }
     if (strcmp(verb, "list") == 0) {
@@ -86,6 +87,10 @@ static void run(char* cmd) {
         int level = b != NULL ? atoi(b) : -1;
         olog("M1 CMD battery test port %d level %d\n", port, level);
         orbit_ble_battery_test(port, level);
+    } else if (strcmp(verb, "openconfig") == 0) {
+        // Types the config tool's address on the PC, as the screen's menu item does.
+        olog("M1 CMD open config page\n");
+        orbit_typist_request_config_url();
     } else if (strcmp(verb, "approve") == 0) {
         olog("M1 CMD approve\n");
         orbit_ble_approve();
