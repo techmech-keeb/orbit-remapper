@@ -18,7 +18,7 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 - 登録済みの機器が組み直しを求めたときは、本体で許可するまでつながない。
 - 画面：状態の色のリング、機器のカード、ダイヤルで操作するメニュー（ペアリング、削除、画面の回転、画面を消すまでの時間）。
 
-これからの予定（機器ごとのレイヤー、切断時の押しっぱなしの解除、設定セット、LED の送り返し）は [M2 の依頼書](dev/drafts/2026-09-30/m2-brief.md) にあります。
+未実装・未検証の機能は、このREADMEと変更履歴で区別して案内します。
 
 ## 使い方
 
@@ -33,11 +33,11 @@ Built on [HID Remapper](https://github.com/jfedor2/hid-remapper) by jfedor2. 本
 
 ## 開発に加わる人へ
 
-ファームウェアの構成、開発の記録、実機の試験の流れは [dev/README.md](dev/README.md) にあります。
+ファームウェアの構成、ビルド・リリースの再現手順、試験コードは [開発者向けガイド](dev/README.md) にあります。
 
 ## 注意
 
-- **USB の VID/PID と製品名**：今は本家の Web 設定ツールをそのまま使うため、本家と同じ `0xCAFE` / `0xBAF2` と「HID Remapper Bluetooth」という製品名を名乗ります。正式な割り当てではありません（[Q35](dev/drafts/2026-09-26/open-questions.md)）。
+- **USB の VID/PID と製品名**：今は本家の Web 設定ツールをそのまま使うため、本家と同じ `0xCAFE` / `0xBAF2` と「HID Remapper Bluetooth」という製品名を名乗ります。正式な割り当てではありません。
 - **名前**：「Orbit」はリポジトリ名として使っているだけで、商標の確認はしていません。
 - **ログ**：ファームウェアのログには、機器のアドレスの下位 2 バイトだけを出します。ペアリングの鍵や M5Dial の MAC アドレスは出しません。
 

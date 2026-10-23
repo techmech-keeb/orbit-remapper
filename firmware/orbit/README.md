@@ -1,6 +1,6 @@
 # Orbit ファーム（M1：本家 HID Remapper を M5Dial で動かす）
 
-初代 M5Dial（ESP32-S3）1 台で、BLE のキーボード・マウス 2 台を受け、本家 [HID Remapper](https://github.com/jfedor2/hid-remapper) のコアでリマップして、USB-C から PC へ USB HID として出すファーム。依頼書は [m1-brief.md](../../dev/drafts/2026-09-27/m1-brief.md)、設計は [implementation-design.md](../../dev/drafts/2026-09-27/implementation-design.md)。
+初代 M5Dial（ESP32-S3）1 台で、BLE のキーボード・マウス 2 台を受け、本家 [HID Remapper](https://github.com/jfedor2/hid-remapper) のコアでリマップして、USB-C から PC へ USB HID として出すファーム。技術的な仕様、ビルド、書き込みと制約を本書に記載します。
 
 使う人向けの説明（書き込み、画面の操作、設定、困ったとき）は [docs/](../../docs/README.md) にある。この文書は作る人・試す人向け。
 
@@ -150,7 +150,7 @@ M1 EVT t=3.512 D0 addr=..:3a:5f connected itvl=6(7.50ms) lat=0 to=400(4000ms)
 
 ## 8. 未確認のこと・制約
 
-- 合格条件の結果は [m1-results.md](../../dev/drafts/2026-09-27/m1-results.md)。A5・A6 が未確認、A8 は測り直し中（このファイルの更新時点）。
+- 合格条件の結果は [実験用プログラム](../../dev/experiments/q31-s3-two-ble/README.md)。A5・A6 が未確認、A8 は測り直し中（このファイルの更新時点）。
 - 機器側に古いペアリングが残っていると暗号化に失敗する（`encryption failed status=0x503/0x505`）。本体はその接続を切る。機器側で Orbit のペアリングを消してやり直す。
 - リモートウェイクアップ（A6）と boot protocol（A5）は本家 USB 版のコードを写したが、ESP32-S3 の TinyUSB で動くかは未確認。USB の機器の区分は複合機器（IAD）にしてあり、BIOS で使えるかも未確認。
 - 数字入力が必要なペアリングには対応していない（「入出力なし」として名乗る）。

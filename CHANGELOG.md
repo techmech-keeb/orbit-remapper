@@ -1,6 +1,6 @@
 # Changelog
 
-Orbit Remapper のファームウェアの変更履歴です。形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に従います。版の番号は [`firmware/orbit/version.txt`](firmware/orbit/version.txt) と対応し、上げ方は [dev/README.md](dev/README.md#版とリリース) にあります。
+Orbit Remapper のファームウェアの変更履歴です。形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に従います。版の番号は [`firmware/orbit/version.txt`](firmware/orbit/version.txt) と対応し、ビルド・リリースの概要は [開発者向けガイド](dev/README.md) にあります。
 
 ## [Unreleased]
 
